@@ -8,6 +8,45 @@ Production-conscious vertical slice of ThatMyAssets AI data-loss prevention: Go 
 - **Dashboard:** Next.js 15, React 19, strict TypeScript. All counts, devices, policies, and activity come from the Control Plane; there are no demo records.
 - **Persistence:** PostgreSQL 17. Only SHA-256 hashes of admin session tokens, pairing codes, and device tokens are stored.
 - **Edge:** Caddy 2 with automatic HTTPS for named sites. Compose exposes only Caddy; the database and application services stay on the private Docker network.
+## Interactive installer (Node.js 20+)
+
+The publishable `@thatmyassets/dashboard` npm package bundles the pinned Go/Next.js source, Compose file, Caddyfile, and database migration. It does not download an unpinned source archive.
+
+```sh
+npx @thatmyassets/dashboard install
+```
+
+The installer asks for Docker or system mode, origin/ports, administrator credentials with confirmation, database credentials, and an optional automation token. Strong random administrator/database passwords are generated when the corresponding prompt is left blank. The automation token is disabled when blank; answer `generate` to create one. Passwords and tokens are never printed. Retrieve generated bootstrap values from the protected `.env` file and store them securely. Existing administrator passwords are not overwritten by application restarts.
+
+The default installation directory is `./tma-dashboard`. Docker mode validates Docker, Compose v2, and the daemon before building, writes `.env` atomically with restrictive permissions, starts the stack, and succeeds only after an end-to-end health check. System mode checks Go, Node.js, npm, PostgreSQL, and `psql`; it prints installation links instead of installing global runtimes. It provisions the application role/database idempotently, builds both applications, then starts systemd services on supported root Linux installations or local background processes on Windows, macOS, and non-root Linux. System mode is localhost HTTP only; use Docker/Caddy for public HTTPS.
+
+Preview a plan without creating files, checking dependencies, or executing installation commands:
+
+```sh
+npx @thatmyassets/dashboard install --dry-run --non-interactive
+```
+
+For CI, set secrets through your CI secret store rather than putting them in shell history:
+
+```sh
+export TMA_ADMIN_PASSWORD='a-long-unique-admin-password'
+export TMA_ADMIN_PASSWORD_CONFIRM="$TMA_ADMIN_PASSWORD"
+export TMA_DB_PASSWORD='a_long_unique_database_password'
+npx @thatmyassets/dashboard install --non-interactive --mode docker \
+  --origin https://dashboard.example.com --install-dir /srv/tma-dashboard
+```
+
+All options have `TMA_` environment equivalents; run `npx @thatmyassets/dashboard --help` for the complete list. Supplied administrator passwords require matching confirmation in noninteractive mode. Passwords use printable ASCII without quotes, dollar signs, or backslashes so Docker, systemd, and local process environments parse identically. Docker database passwords additionally use only URL-safe letters, numbers, `_`, and `-`.
+
+Manage a local-process installation with the same package version:
+
+```sh
+npx @thatmyassets/dashboard start --install-dir ./tma-dashboard
+npx @thatmyassets/dashboard stop --install-dir ./tma-dashboard
+```
+
+On systemd installations use `sudo systemctl start|stop tma-dashboard.service tma-control-plane.service`. On Docker installations use `docker compose --env-file .env up -d` or `down` from the installation directory. Local stdout/stderr logs are under `logs/`; no secret values are written to them by the installer.
+
 
 ## Run with Docker Compose
 
@@ -80,9 +119,11 @@ go test -race ./...
 go vet ./...
 cd web && npm ci && npm test && npx tsc --noEmit && npm run build
 cd .. && docker compose --env-file .env config --quiet
+npm test
+npm pack --dry-run
 ```
 
-GitHub Actions runs formatting verification, vet, race-enabled Go tests, frontend unit tests, TypeScript checks, production build, and Compose validation.
+GitHub Actions runs formatting verification, vet, race-enabled Go tests, frontend unit tests, TypeScript checks, production build, Compose validation, installer tests, and an npm package-content dry run.
 
 ## API
 
@@ -126,7 +167,7 @@ Publishing a policy creates a new immutable version. Agents receive the latest v
 
 ## Operational notes and current limits
 
-- Single-adminusername bootstrap is included; there is no user-management UI, SSO, MFA, tenant isolation, or email recovery in this slice.
+- Single-admin username bootstrap is included; there is no user-management UI, SSO, MFA, tenant isolation, or email recovery in this slice.
 - Sessions expire after eight hours. PostgreSQL cleanup removes expired rows on later maintenance; expiration is enforced on every read regardless of cleanup.
 - Revocation is permanent for a device enrollment. Enroll a replacement with a new one-time code rather than reusing a token.
 - Event and policy lists are capped for this vertical slice. Pagination beyond the current 200-event and 100-policy limits is not included.

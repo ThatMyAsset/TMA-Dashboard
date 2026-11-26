@@ -46,3 +46,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose --env-file .env.example config --quiet
+
+  installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - run: npm test
+      - run: npm pack --dry-run
