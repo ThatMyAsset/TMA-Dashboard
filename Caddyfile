@@ -1,0 +1,16 @@
+{$SITE_ADDRESS:localhost}
+
+encode zstd gzip
+
+header {
+	-Server
+	X-Content-Type-Options nosniff
+	X-Frame-Options DENY
+	Referrer-Policy same-origin
+	Permissions-Policy "camera=(), microphone=(), geolocation=()"
+}
+
+@api path /api/v1/* /healthz
+reverse_proxy @api control-plane:8080
+
+reverse_proxy dashboard:3000

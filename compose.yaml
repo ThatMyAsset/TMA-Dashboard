@@ -1,0 +1,80 @@
+name: tma-dashboard
+
+services:
+  postgres:
+    image: postgres:17.2-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tma}
+      POSTGRES_USER: ${POSTGRES_USER:-tma}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [backend]
+
+  control-plane:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-tma}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tma}?sslmode=disable
+      LISTEN_ADDR: :8080
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+      COOKIE_SECURE: "true"
+      TRUST_PROXY: "true"
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    networks: [backend]
+
+  dashboard:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      CONTROL_PLANE_URL: http://control-plane:8080
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      control-plane:
+        condition: service_started
+    networks: [backend]
+
+  caddy:
+    image: caddy:2.9.1-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [dashboard, control-plane]
+    networks: [backend]
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  backend:
+    driver: bridge

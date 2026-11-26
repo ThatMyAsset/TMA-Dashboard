@@ -1,0 +1,12 @@
+.env
+*.local
+/control-plane
+/control-plane.exe
+/coverage.out
+web/node_modules/
+web/.next/
+web/out/
+web/*.tsbuildinfo
+.DS_Store
+.tmp-*
+.agent-check-target/
