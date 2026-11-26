@@ -48,6 +48,9 @@ test("packaging builds an offline bundle with valid versioned contents", shellOp
     "TMA-Dashboard-Setup/setup.sh",
   ];
   for (const entry of expectedFiles) assert.ok(entries.includes(entry), `missing ${entry}`);
+  const modes = run("tar", ["-tvzf", archive]);
+  assert.match(modes, /^-rwxr-xr-x .*TMA-Dashboard-Setup\/setup\.sh$/m, "setup.sh must be executable in the tar header");
+  assert.doesNotMatch(modes, /^-rwx.*\.tgz$/m, "package data must not be executable");
   assert.equal(entries.filter((entry) => entry.endsWith(".tgz")).length, 1);
   assert.ok(entries.every((entry) => entry === "TMA-Dashboard-Setup/" || entry.startsWith("TMA-Dashboard-Setup/")));
 

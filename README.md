@@ -15,10 +15,10 @@ The `@thatmyassets/dashboard` package is **not published to the npm registry**, 
 ```sh
 curl -fLO https://github.com/ThatMyAsset/TMA-Dashboard/releases/download/v0.1.0/TMA-Dashboard-Setup.tar.gz
 tar -xzf TMA-Dashboard-Setup.tar.gz
-./TMA-Dashboard-Setup/setup.sh install
+sh ./TMA-Dashboard-Setup/setup.sh install
 ```
 
-`setup.sh` checks the bundled SHA-256 checksum, installs the included npm tarball into a temporary directory **without contacting the npm registry**, runs the same interactive installer, and removes the temporary installation when finished. It never installs operating-system packages, Docker, or other runtimes. Missing Node.js 20+, npm, `tar`, or `sha256sum` produces an error with instructions instead.
+`setup.sh` is executable in the release archive. Invoking it through `sh` also works if executable permission was lost during download or extraction. The script checks the bundled SHA-256 checksum, installs the included npm tarball into a temporary directory **without contacting the npm registry**, runs the same interactive installer, and removes the temporary installation when finished. It never installs operating-system packages, Docker, or other runtimes. Missing Node.js 20+, npm, `tar`, or `sha256sum` produces an error with instructions instead. Git-based `npx github:` installation can be blocked by npm's `EALLOWGIT` policy; the release bundle does not use that mechanism.
 
 For a reproducible downloader with archive validation and automatic temporary-file cleanup, inspect [`install.sh`](./install.sh), then run it:
 

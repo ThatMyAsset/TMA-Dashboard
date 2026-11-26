@@ -18,13 +18,13 @@ const archive = path.join(outputDirectory, archiveName);
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
-    cwd: options.cwd || root,
+    cwd: options.cwd || root, env: options.env || process.env, input: options.input,
     encoding: "utf8",
-    shell: process.platform === "win32" && command === "npm",
-    stdio: ["inherit", "pipe", "inherit"],
+    shell: options.shell ?? (process.platform === "win32" && command === "npm"),
+    stdio: ["inherit", "pipe", "pipe"],
   });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}`);
+  if (result.status !== 0) { if (result.stderr) process.stderr.write(result.stderr); if (result.stdout) process.stdout.write(result.stdout); throw new Error(`${command} exited with status ${result.status}`); }
   return result.stdout.trim();
 }
 
@@ -32,6 +32,7 @@ function digest(file) {
   return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 }
 
+fs.mkdirSync(outputDirectory, { recursive: true });
 fs.rmSync(staging, { recursive: true, force: true });
 fs.mkdirSync(bundleDirectory, { recursive: true });
 try {
@@ -45,7 +46,12 @@ try {
   const checksum = `${digest(path.join(bundleDirectory, packageName))}  ${packageName}\n`;
   fs.writeFileSync(path.join(bundleDirectory, "SHA256SUMS"), checksum);
 
-  run("tar", ["-czf", archive, "-C", staging, releaseName]);
+  const wslPath = (value) => value.replaceAll("\\", "/").replace(/^([A-Za-z]):/, (_, drive) => `/mnt/${drive.toLowerCase()}`);
+  if (process.platform === "win32") {
+    run("wsl.exe", ["-d", "Ubuntu-22.04", "--", "bash", "-c", `set -eux; work=$(mktemp -d); cp -R '${wslPath(staging)}/${releaseName}' "$work/"; chmod 755 "$work/${releaseName}"; find "$work/${releaseName}" -type f -exec chmod 644 {} +; chmod 755 "$work/${releaseName}/setup.sh"; tar -czf '${wslPath(archive)}' -C "$work" '${releaseName}'; rm -rf "$work"`], { shell: true });
+  } else {
+    run("tar", ["-czf", archive, "-C", staging, releaseName]);
+  }
   fs.writeFileSync(`${archive}.sha256`, `${digest(archive)}  ${archiveName}\n`);
   console.log(`Built ${archive}`);
   console.log(`Built ${archive}.sha256`);
