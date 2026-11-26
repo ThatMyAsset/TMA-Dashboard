@@ -8,7 +8,7 @@ const { setTimeout: sleep } = require("node:timers/promises");
 const { parseArguments, collect, packageVersion, HELP } = require("./cli.cjs");
 const { renderEnv, redactEnv, parseEnv } = require("./config.cjs");
 
-const SOURCE_ENTRIES = ["cmd", "internal", "web", "compose.yaml", "Dockerfile", "Caddyfile", ".dockerignore", ".env.example", "go.mod", "go.sum", "README.md", "LICENSE"];
+const SOURCE_ENTRIES = ["cmd", "internal", "web", "compose.yaml", "Dockerfile", ".dockerignore", ".env.example", "go.mod", "go.sum", "README.md", "LICENSE"];
 const executable = (name) => process.platform === "win32" ? `${name}.exe` : name;
 
 function run(command, args, options = {}) {
@@ -74,7 +74,7 @@ function composeArgs(config, ...args) {
   return ["compose", "--env-file", path.join(config.installDir, ".env"), "-f", path.join(config.installDir, "compose.yaml"), ...args];
 }
 async function assertPortsFree(config) {
-  const ports = config.mode === "docker" ? [config.httpPort, config.httpsPort] : [config.webPort, config.controlPlanePort];
+  const ports = config.mode === "docker" ? [config.webPort] : [config.webPort, config.controlPlanePort];
   const busy = [];
   for (const port of ports) {
     if (await new Promise((resolve) => {
@@ -85,7 +85,7 @@ async function assertPortsFree(config) {
     })) busy.push(port);
   }
   if (busy.length) {
-    throw new Error(`port already in use: ${busy.join(", ")}. Check with: ss -ltnp | grep -E ':(${busy.join("|")})\\b'. Stop the conflicting service or rerun setup and choose unused ports. Update Public origin and your SSH tunnel to the same HTTPS port.`);
+    throw new Error(`port already in use: ${busy.join(", ")}. Check with: ss -ltnp | grep -E ':(${busy.join("|")})\\b'. Stop the conflicting service or rerun setup and choose unused ports. Update the browser origin and SSH tunnel to use the same Dashboard port.`);
   }
 }
 
@@ -94,7 +94,13 @@ async function waitForDocker(config) {
   let lastError = "services are not ready";
   while (Date.now() < deadline) {
     try {
-      await run("docker", composeArgs(config, "exec", "-T", "dashboard", "node", "-e", "Promise.all([fetch('http://control-plane:8080/healthz'),fetch('http://127.0.0.1:3000/login')]).then(rs=>{if(rs.some(r=>r.status!==200))process.exit(1)}).catch(()=>process.exit(1))"), { cwd: config.installDir, capture: true });
+      await run("docker", composeArgs(config, "exec", "-T", "control-plane", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"), { cwd: config.installDir, capture: true });
+      const ui = await fetch(`http://127.0.0.1:${config.webPort}/login`, { signal: AbortSignal.timeout(3000) });
+      if (ui.status !== 200) throw new Error(`published Dashboard returned HTTP ${ui.status}`);
+      if (config.secureCookies) {
+        const response = await fetch(`${config.origin}/login`, { signal: AbortSignal.timeout(3000) });
+        if (response.status !== 200) throw new Error(`trusted HTTPS proxy returned HTTP ${response.status}`);
+      }
       return;
     } catch (error) { lastError = error.message; }
     await sleep(2000);
@@ -104,8 +110,8 @@ async function waitForDocker(config) {
 
 async function installDocker(config) {
   await requireCommands([["docker", ["--version"]], ["docker", ["compose", "version"], "Docker Compose v2"], ["docker", ["info", "--format", "{{.ServerVersion}}"], "running Docker daemon"]]);
-  console.log("Build images include Go 1.23 and Node.js 22; PostgreSQL and Caddy are pinned in compose.yaml.");
-  console.log("Building and starting PostgreSQL, Control Plane, Dashboard, and Caddy...");
+  console.log("Build images include Go 1.23 and Node.js 22; PostgreSQL is pinned in compose.yaml.");
+  console.log("Building and starting PostgreSQL, Control Plane, and Dashboard...");
   await run("docker", composeArgs(config, "config", "--quiet"), { cwd: config.installDir });
   await run("docker", composeArgs(config, "up", "--build", "-d"), { cwd: config.installDir });
   await waitForDocker(config);
@@ -264,7 +270,7 @@ async function installSystem(config, requestedService) {
 function plan(config) {
   const commands = config.mode === "docker" ? [
     "docker compose --env-file .env up --build -d",
-    "Require Control Plane /healthz and Dashboard /login to return HTTP 200",
+    `Require host Dashboard :${config.webPort}/login and internal Control Plane /healthz to return HTTP 200${config.secureCookies ? `, plus trusted HTTPS proxy ${config.origin}/login` : ""}`,
   ] : [
     "Configure PostgreSQL role/database with psql",
     "go build -trimpath -o bin/control-plane ./cmd/control-plane",

@@ -1,16 +1,17 @@
 # TMA Control Center
 
-Production-conscious vertical slice of ThatMyAssets AI data-loss prevention: Go Control Plane, PostgreSQL, Next.js admin dashboard, and Caddy. The initial release manages browser agents and local text-inspection metadata only. It does not provide desktop application control, OCR, or archive inspection.
+Production-conscious vertical slice of ThatMyAssets AI data-loss prevention: Go Control Plane, PostgreSQL, and Next.js admin dashboard. The initial release manages browser agents and local text-inspection metadata only. It does not provide desktop application control, OCR, or archive inspection.
 
 ## Stack
 
 - **Control Plane:** Go 1.23, `net/http`, pgx, bcrypt. Database migrations run at startup under a PostgreSQL advisory lock.
 - **Dashboard:** Next.js 15, React 19, strict TypeScript. All counts, devices, policies, and activity come from the Control Plane; there are no demo records.
 - **Persistence:** PostgreSQL 17. Only SHA-256 hashes of admin session tokens, pairing codes, and device tokens are stored.
-- **Edge:** Caddy 2 with automatic HTTPS for named sites. Compose exposes only Caddy; the database and application services stay on the private Docker network.
+- **Network:** Compose publishes only Next.js on host loopback by default. PostgreSQL and the Control Plane stay on the private Docker network. No bundled reverse proxy or TLS service is required.
+
 ## Install from GitHub Releases (Ubuntu/Linux, Node.js 20+)
 
-The `@thatmyassets/dashboard` package is **not published to the npm registry**, so `npx @thatmyassets/dashboard install` returns `E404`. That command is not required. Download the versioned release bundle and inspect its small setup script before running it:
+The `@thatmyassets/dashboard` package is **not published to the npm registry**. Download the versioned release bundle and inspect its small setup script before running it; no registry download is needed:
 
 ```sh
 curl -fLO https://github.com/ThatMyAsset/TMA-Dashboard/releases/download/v0.1.0/TMA-Dashboard-Setup.tar.gz
@@ -18,7 +19,7 @@ tar -xzf TMA-Dashboard-Setup.tar.gz
 sh ./TMA-Dashboard-Setup/setup.sh install
 ```
 
-`setup.sh` is executable in the release archive. Invoking it through `sh` also works if executable permission was lost during download or extraction. The script checks the bundled SHA-256 checksum, installs the included npm tarball into a temporary directory **without contacting the npm registry**, runs the same interactive installer, and removes the temporary installation when finished. It never installs operating-system packages, Docker, or other runtimes. Missing Node.js 20+, npm, `tar`, or `sha256sum` produces an error with instructions instead. Git-based `npx github:` installation can be blocked by npm's `EALLOWGIT` policy; the release bundle does not use that mechanism.
+`setup.sh` is executable in the release archive. Invoking it through `sh` also works if executable permission was lost during download or extraction. The script checks the bundled SHA-256 checksum, installs the included npm tarball into a temporary directory **without contacting the npm registry**, runs the same interactive installer, and removes the temporary installation when finished. It never installs operating-system packages, Docker, or other runtimes. Missing Node.js 20+, npm, `tar`, or `sha256sum` produces an error with instructions instead. The release bundle does not use Git-based installation.
 
 For a reproducible downloader with archive validation and automatic temporary-file cleanup, inspect [`install.sh`](./install.sh), then run it:
 
@@ -28,11 +29,11 @@ chmod +x install.sh
 ./install.sh
 ```
 
-Optional release verification uses the separately uploaded `TMA-Dashboard-Setup.tar.gz.sha256` when present; the npm tarball checksum inside the bundle is always checked. Set `TMA_VERSION` to select another published release, for example `TMA_VERSION=0.1.1 ./install.sh`. Direct `npx github:ThatMyAsset/TMA-Dashboard install` is intentionally not recommended: Git dependencies use a source checkout rather than this verified release bundle.
+Optional release verification uses the separately uploaded `TMA-Dashboard-Setup.tar.gz.sha256` when present; the npm tarball checksum inside the bundle is always checked. Set `TMA_VERSION` to select another published release, for example `TMA_VERSION=0.1.1 ./install.sh`.
 
-The release installer asks for Docker or system mode, origin/ports, administrator credentials with confirmation, database credentials, and an optional automation token. Strong random administrator/database passwords are generated when the corresponding prompt is left blank. The automation token is disabled when blank; answer `generate` to create one. Passwords and tokens are never printed. Retrieve generated bootstrap values from the protected `.env` file and store them securely. Existing administrator passwords are not overwritten by application restarts.
+The release installer asks for Docker or system mode, the Dashboard HTTP port and browser origin, administrator credentials with confirmation, database credentials, and an optional automation token. Strong random administrator/database passwords are generated when the corresponding prompt is left blank. The automation token is disabled when blank; answer `generate` to create one. Passwords and tokens are never printed. Retrieve generated bootstrap values from the protected `.env` file and store them securely. Existing administrator passwords are not overwritten by application restarts.
 
-The default installation directory is `./tma-dashboard`. Docker mode validates Docker, Compose v2, and the daemon before building, writes `.env` atomically with restrictive permissions, starts the stack, and succeeds only after an end-to-end health check. System mode checks Go, Node.js, npm, PostgreSQL, and `psql`; it prints installation links instead of installing global runtimes. It provisions the application role/database idempotently, builds both applications, then starts systemd services on supported root Linux installations or local background processes on Windows, macOS, and non-root Linux. System mode is localhost HTTP only; use Docker/Caddy for public HTTPS.
+The default installation directory is `./tma-dashboard`. Docker mode validates Docker, Compose v2, and the daemon before building, writes `.env` atomically with restrictive permissions, starts the stack, and succeeds only after direct host Dashboard and internal Control Plane health checks pass. System mode checks Go, Node.js, npm, PostgreSQL, and `psql`; it prints installation links instead of installing global runtimes. It provisions the application role/database idempotently, builds both applications, then starts systemd services on supported root Linux installations or local background processes on Windows, macOS, and non-root Linux. Both modes default to localhost HTTP.
 
 Preview a plan without creating files, checking dependencies, or executing installation commands:
 
@@ -47,7 +48,7 @@ export TMA_ADMIN_PASSWORD='a-long-unique-admin-password'
 export TMA_ADMIN_PASSWORD_CONFIRM="$TMA_ADMIN_PASSWORD"
 export TMA_DB_PASSWORD='a_long_unique_database_password'
 ./TMA-Dashboard-Setup/setup.sh install --non-interactive --mode docker \
-  --origin https://dashboard.example.com --install-dir /srv/tma-dashboard
+  --web-port 3000 --origin http://localhost:3000 --install-dir /srv/tma-dashboard
 ```
 
 All options have `TMA_` environment equivalents; run `./TMA-Dashboard-Setup/setup.sh --help` for the complete list. Supplied administrator passwords require matching confirmation in noninteractive mode. Passwords use printable ASCII without quotes, dollar signs, or backslashes so Docker, systemd, and local process environments parse identically. Docker database passwords additionally use only URL-safe letters, numbers, `_`, and `-`.
@@ -59,7 +60,7 @@ Keep the extracted bundle to manage a local-process installation with the same p
 ./TMA-Dashboard-Setup/setup.sh stop --install-dir ./tma-dashboard
 ```
 
-On systemd installations use `sudo systemctl start|stop tma-dashboard.service tma-control-plane.service`. On Docker installations use `docker compose --env-file .env up -d` or `down` from the installation directory. Local stdout/stderr logs are under `logs/`; no secret values are written to them by the installer.
+On systemd installations use `sudo systemctl start|stop tma-dashboard.service tma-control-plane.service`. On Docker installations use `docker compose --env-file .env up -d` or `down` from the installation directory. Local stdout/stderr logs are under `logs/`; no secret values are written to them by the installer. For noninteractive Docker installs, `--origin http://localhost:PORT` sets the exact browser origin and must use the same port as `--web-port`.
 
 
 ## Run with Docker Compose
@@ -73,10 +74,17 @@ Prerequisites: Docker Engine with Compose v2.
    ```sh
    docker compose --env-file .env up --build -d
    docker compose ps
-   curl -k https://localhost/healthz
+   curl -f http://127.0.0.1:3000/login
+   docker compose --env-file .env exec -T control-plane wget -q -O /dev/null http://localhost:8080/healthz
    ```
 
-4. Open `https://localhost`. Caddy uses a local development certificate, so trust that certificate in your browser or proceed through its local-certificate warning. Sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
+4. Open `http://localhost:3000` and sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`. Dashboard binds `127.0.0.1` by default, so a remote VPS needs an SSH tunnel:
+
+   ```sh
+   ssh -L 3000:127.0.0.1:3000 user@server
+   ```
+
+   Keep that tunnel open while browsing `http://localhost:3000`.
 
 The initial administrator and default policy are created only when absent. Changing `ADMIN_PASSWORD` after the first start does **not** overwrite an existing administrator password. Destroying the PostgreSQL volume resets all local data:
 
@@ -88,14 +96,15 @@ docker compose down -v
 
 ### Public deployment
 
-Set these values in `.env` before starting:
+Do not expose plain HTTP Dashboard publicly. Public HTTPS requires a separately installed, trusted reverse proxy that terminates TLS and forwards requests to the private Dashboard port. This bundle does not configure that proxy. Configure it to proxy to `http://127.0.0.1:3000`, preserve the public `Host`, and pass standard forwarded headers. Then set:
 
 ```dotenv
-SITE_ADDRESS=dashboard.example.com
 ALLOWED_ORIGINS=https://dashboard.example.com
+COOKIE_SECURE=true
+TRUST_PROXY=true
 ```
 
-Point the public DNS record at the Caddy host and allow inbound TCP 80 and 443. Caddy obtains and renews the public certificate. The Compose Control Plane always sets `COOKIE_SECURE=true` and trusts forwarded client IPs only on the private Docker network. Keep PostgreSQL unpublished. Use a secrets manager rather than committing `.env`.
+Keep `DASHBOARD_HOST=127.0.0.1` when the proxy runs on the same host. Changing `DASHBOARD_HOST` to a non-loopback address exposes unencrypted HTTP and is unsafe unless a trusted network boundary protects it. PostgreSQL and the Control Plane remain unpublished. Use a secrets manager rather than committing `.env`.
 
 ## Local development
 
@@ -131,7 +140,7 @@ Open `http://localhost:3000`. The Next.js same-origin route forwards only browse
 go test ./...
 go test -race ./...
 go vet ./...
-cd web && npm ci && npm test && npx tsc --noEmit && npm run build
+cd web && npm ci && npm test && npm run typecheck && npm run build
 cd .. && docker compose --env-file .env config --quiet
 npm test
 npm pack --dry-run

@@ -38,17 +38,14 @@ function validateConfig(config) {
   config.installDir = path.resolve(config.installDir);
   config.origin = parseOrigin(config.origin);
   const parsed = new URL(config.origin);
-  config.siteAddress = parsed.host;
   config.secureCookies = parsed.protocol === "https:";
-  config.httpPort = integer(config.httpPort, "HTTP port");
-  config.httpsPort = integer(config.httpsPort, "HTTPS port");
-  config.webPort = integer(config.webPort, "web port");
+  config.webPort = integer(config.webPort, "Dashboard port");
   config.controlPlanePort = integer(config.controlPlanePort, "Control Plane port");
   config.dbPort = integer(config.dbPort, "PostgreSQL port");
   if (new Set([config.webPort, config.controlPlanePort]).size !== 2) throw new Error("web and Control Plane ports must differ");
-  if (config.mode === "system" && config.secureCookies) throw new Error("system mode serves local HTTP only; use Docker mode for public HTTPS");
-  if (config.mode === "system" && parsed.port && Number(parsed.port) !== config.webPort) throw new Error("system origin port must match the web port");
-  if (config.mode === "docker" && parsed.port && Number(parsed.port) !== config.httpsPort) throw new Error("Docker origin port must match the HTTPS port");
+  if (config.mode === "system" && config.secureCookies) throw new Error("system mode serves local HTTP only");
+  if ((config.mode === "system" || !config.secureCookies) && Number(parsed.port || (parsed.protocol === "http:" ? 80 : 443)) !== config.webPort) throw new Error("origin port must match the Dashboard port");
+  if (config.mode === "docker" && !config.secureCookies) console.warn("WARNING: local HTTP mode sends credentials without TLS. Keep Dashboard bound to loopback or place a trusted HTTPS reverse proxy in front before remote use.");
   if (!/^[a-z][a-z0-9_]{0,62}$/.test(config.adminUsername)) throw new Error("admin username must start with a lowercase letter and contain only lowercase letters, numbers, and underscores");
   validateSecret(config.adminPassword, "admin password");
   validateSecret(config.dbPassword, "database password", 16, 128);
@@ -69,14 +66,11 @@ function validateConfig(config) {
 
 function defaults(options = {}) {
   const docker = (options.mode || "docker") === "docker";
-  const httpsPort = options.httpsPort || 443;
   const webPort = options.webPort || 3000;
   return {
     mode: docker ? "docker" : "system",
     installDir: options.installDir || path.resolve("tma-dashboard"),
-    origin: options.origin || (docker ? `https://localhost:${httpsPort}` : `http://localhost:${webPort}`),
-    httpPort: options.httpPort || 80,
-    httpsPort,
+    origin: options.origin || `http://localhost:${webPort}`,
     webPort,
     controlPlanePort: options.controlPlanePort || 8080,
     dbHost: options.dbHost || "127.0.0.1",
@@ -105,12 +99,11 @@ function renderEnv(config) {
     ADMIN_USERNAME: config.adminUsername,
     ADMIN_PASSWORD: config.adminPassword,
     ADMIN_API_TOKEN: config.adminApiToken,
-    SITE_ADDRESS: config.siteAddress,
-    HTTP_PORT: String(config.httpPort),
-    HTTPS_PORT: String(config.httpsPort),
+    DASHBOARD_HOST: "127.0.0.1",
+    WEB_PORT: String(config.webPort),
     ALLOWED_ORIGINS: config.origin,
     COOKIE_SECURE: String(config.secureCookies),
-    TRUST_PROXY: "false",
+    TRUST_PROXY: String(config.secureCookies),
   };
   if (config.mode === "system") Object.assign(values, {
     DATABASE_URL: config.databaseUrl,

@@ -20,10 +20,8 @@ Commands:
 Options:
   --mode docker|system          Deployment mode (default: docker)
   --install-dir PATH            Installation directory (default: ./tma-dashboard)
-  --origin URL                  Public HTTP(S) origin, without a path
-  --http-port PORT              Caddy HTTP port (default: 80)
-  --https-port PORT             Caddy HTTPS port (default: 443)
-  --web-port PORT               System web port (default: 3000)
+  --origin URL                  Browser HTTP(S) origin, without a path
+  --web-port PORT               Dashboard HTTP port (default: 3000)
   --control-plane-port PORT     System Control Plane port (default: 8080)
   --admin-name NAME             Initial administrator name (default: admin)
   --admin-password VALUE        Initial administrator password (12–72 bytes)
@@ -46,8 +44,8 @@ Environment equivalents use the TMA_ prefix and uppercase flag names:
   TMA_MODE, TMA_INSTALL_DIR, TMA_ORIGIN, TMA_ADMIN_NAME,
   TMA_ADMIN_PASSWORD, TMA_ADMIN_PASSWORD_CONFIRM, TMA_ADMIN_API_TOKEN,
   TMA_DB_NAME, TMA_DB_USER, TMA_DB_PASSWORD, TMA_DB_HOST, TMA_DB_PORT,
-  TMA_DB_ADMIN_URL, TMA_HTTP_PORT, TMA_HTTPS_PORT, TMA_WEB_PORT,
-  TMA_CONTROL_PLANE_PORT, TMA_NON_INTERACTIVE, TMA_SERVICE,
+  TMA_DB_ADMIN_URL, TMA_WEB_PORT, TMA_CONTROL_PLANE_PORT,
+  TMA_NON_INTERACTIVE, TMA_SERVICE,
   TMA_GENERATE_ADMIN_API_TOKEN, TMA_DRY_RUN.
 
 Secrets are never printed. Bootstrap values are stored in the protected .env
@@ -58,8 +56,7 @@ protected .pgpass file, not shell history.
 
 const FLAGS = {
   "mode": "mode", "install-dir": "installDir", "origin": "origin",
-  "http-port": "httpPort", "https-port": "httpsPort", "web-port": "webPort",
-  "control-plane-port": "controlPlanePort", "admin-name": "adminUsername",
+  "web-port": "webPort", "control-plane-port": "controlPlanePort",
   "admin-password": "adminPassword", "admin-password-confirm": "adminPasswordConfirm",
   "admin-api-token": "adminApiToken", "db-name": "dbName", "db-user": "dbUser",
   "db-password": "dbPassword", "db-host": "dbHost", "db-port": "dbPort",
@@ -138,13 +135,10 @@ async function collect(options) {
     if (interactive) {
       config.mode = (await ask("Deployment mode: docker or system", config.mode)).toLowerCase();
       config.installDir = await ask("Installation directory", config.installDir);
-      const isDocker = config.mode === "docker";
-      if (isDocker) {
-        config.httpsPort = Number(await ask("HTTPS port", config.httpsPort));
-        config.httpPort = Number(await ask("HTTP port", config.httpPort));
-        config.origin = await ask("Public origin", `https://localhost:${config.httpsPort}`);
+      config.webPort = Number(await ask("Dashboard HTTP port", config.webPort));
+      if (config.mode === "docker") {
+        config.origin = await ask("Browser origin (use --origin for noninteractive installs)", config.origin);
       } else {
-        config.webPort = Number(await ask("Dashboard port", config.webPort));
         config.controlPlanePort = Number(await ask("Control Plane port", config.controlPlanePort));
         config.origin = await ask("Browser origin", `http://localhost:${config.webPort}`);
       }

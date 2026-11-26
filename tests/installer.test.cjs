@@ -13,12 +13,17 @@ const net = require("node:net");
 const passwords = { adminPassword: "correct-horse-battery", adminPasswordConfirm: "correct-horse-battery", dbPassword: "database_password_12345" };
 
 test("noninteractive arguments and environment create a valid configuration", async () => {
-  const parsed = parseArguments(["install", "--non-interactive", "--mode", "docker", "--https-port=8443", "--origin", "https://localhost:8443"], {});
+  const parsed = parseArguments(["install", "--non-interactive", "--mode", "docker", "--web-port=3100", "--origin", "http://localhost:3100"], {});
   const config = await collect({ ...parsed.options, ...passwords });
   assert.equal(config.mode, "docker");
-  assert.equal(config.httpsPort, 8443);
-  assert.equal(config.siteAddress, "localhost:8443");
-  assert.ok(config.adminApiToken === "");
+  assert.equal(config.webPort, 3100);
+  assert.equal(config.origin, "http://localhost:3100");
+  const dockerEnv = parseEnv(renderEnv(config));
+  assert.equal(dockerEnv.WEB_PORT, "3100");
+  assert.equal(dockerEnv.DASHBOARD_HOST, "127.0.0.1");
+  assert.equal(dockerEnv.ALLOWED_ORIGINS, "http://localhost:3100");
+  assert.equal(dockerEnv.COOKIE_SECURE, "false");
+  assert.equal(dockerEnv.TRUST_PROXY, "false");
 
   const env = parseArguments(["install"], { CI: "true", TMA_MODE: "system", TMA_ORIGIN: "http://localhost:3100", TMA_WEB_PORT: "3100", TMA_ADMIN_NAME: "operator" });
   assert.equal(env.options.nonInteractive, true);
@@ -33,11 +38,12 @@ test("origins, ports, identifiers, and Docker database passwords are validated",
   assert.equal(parseOrigin("https://dashboard.example.com"), "https://dashboard.example.com");
   assert.throws(() => parseOrigin("https://dashboard.example.com/path"), /only/);
   assert.throws(() => parseOrigin("http://dashboard.example.com"), /HTTPS/);
-  assert.throws(() => validateConfig(defaults({ ...passwords, httpsPort: "0", origin: "https://localhost" })), /HTTPS port/);
+  assert.throws(() => validateConfig(defaults({ ...passwords, webPort: "0" })), /Dashboard port/);
   assert.throws(() => validateConfig(defaults({ ...passwords, adminUsername: "Admin User" })), /admin username/);
   assert.throws(() => validateConfig(defaults({ ...passwords, dbPassword: "unsafe:password_12345" })), /URL-safe/);
   assert.throws(() => validateConfig(defaults({ ...passwords, mode: "system", origin: "https://localhost:3000" })), /local HTTP/);
-  assert.throws(() => validateConfig(defaults({ ...passwords, origin: "https://localhost:8443" })), /origin port/);
+  assert.throws(() => validateConfig(defaults({ ...passwords, origin: "http://localhost:8443" })), /origin port/);
+  assert.equal(validateConfig(defaults({ ...passwords, mode: "docker", origin: "https://dashboard.example.com" })).secureCookies, true);
 });
 
 test("environment rendering round-trips and URL-encodes system credentials", () => {
@@ -102,8 +108,8 @@ test("occupied deployment ports fail before any installation files are written",
   context.after(() => new Promise((resolve) => listener.close(resolve)));
   const installDir = path.join(await fs.promises.mkdtemp(path.join(os.tmpdir(), "tma-port-test-")), "installation");
   context.after(() => fs.promises.rm(path.dirname(installDir), { recursive: true, force: true }));
-  const config = validateConfig(defaults({ ...passwords, installDir, httpsPort: port, origin: `https://localhost:${port}` }));
+  const config = validateConfig(defaults({ ...passwords, installDir, webPort: port }));
   await assert.rejects(assertPortsFree(config), new RegExp(`port already in use: ${port}`));
-  await assert.rejects(main(["install", "--non-interactive", "--install-dir", installDir, "--https-port", String(port), "--origin", `https://localhost:${port}`, "--admin-password", passwords.adminPassword, "--admin-password-confirm", passwords.adminPasswordConfirm, "--db-password", passwords.dbPassword]), /port already in use/);
+  await assert.rejects(main(["install", "--non-interactive", "--install-dir", installDir, "--web-port", String(port), "--origin", `http://localhost:${port}`, "--admin-password", passwords.adminPassword, "--admin-password-confirm", passwords.adminPasswordConfirm, "--db-password", passwords.dbPassword]), /port already in use/);
   assert.equal(fs.existsSync(installDir), false);
 });

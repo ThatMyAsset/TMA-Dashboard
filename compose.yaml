@@ -28,9 +28,9 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
-      COOKIE_SECURE: "true"
-      TRUST_PROXY: "true"
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:${WEB_PORT:-3000}}
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,30 +50,15 @@ services:
       CONTROL_PLANE_URL: http://control-plane:8080
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
+    ports:
+      - "${DASHBOARD_HOST:-127.0.0.1}:${WEB_PORT:-3000}:3000"
     depends_on:
       control-plane:
-        condition: service_started
-    networks: [backend]
-
-  caddy:
-    image: caddy:2.9.1-alpine
-    restart: unless-stopped
-    ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on: [dashboard, control-plane]
+        condition: service_healthy
     networks: [backend]
 
 volumes:
   postgres-data:
-  caddy-data:
-  caddy-config:
 
 networks:
   backend:

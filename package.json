@@ -21,7 +21,6 @@
     "!web/*.tsbuildinfo",
     "compose.yaml",
     "Dockerfile",
-    "Caddyfile",
     ".dockerignore",
     ".env.example",
     "go.mod",
