@@ -10,3 +10,5 @@ web/*.tsbuildinfo
 .DS_Store
 .tmp-*
 .agent-check-target/
+release/
+*.tgz

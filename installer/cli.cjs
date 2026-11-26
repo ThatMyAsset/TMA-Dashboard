@@ -8,9 +8,9 @@ const { defaults, validateConfig, secret } = require("./config.cjs");
 const HELP = `ThatMyAssets Dashboard installer
 
 Usage:
-  npx @thatmyassets/dashboard install [options]
-  npx @thatmyassets/dashboard start [--install-dir PATH]
-  npx @thatmyassets/dashboard stop [--install-dir PATH]
+  tma-dashboard install [options]
+  tma-dashboard start [--install-dir PATH]
+  tma-dashboard stop [--install-dir PATH]
 
 Commands:
   install       Configure, build, and start Dashboard (default)

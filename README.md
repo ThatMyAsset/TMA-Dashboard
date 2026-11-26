@@ -8,22 +8,36 @@ Production-conscious vertical slice of ThatMyAssets AI data-loss prevention: Go 
 - **Dashboard:** Next.js 15, React 19, strict TypeScript. All counts, devices, policies, and activity come from the Control Plane; there are no demo records.
 - **Persistence:** PostgreSQL 17. Only SHA-256 hashes of admin session tokens, pairing codes, and device tokens are stored.
 - **Edge:** Caddy 2 with automatic HTTPS for named sites. Compose exposes only Caddy; the database and application services stay on the private Docker network.
-## Interactive installer (Node.js 20+)
+## Install from GitHub Releases (Ubuntu/Linux, Node.js 20+)
 
-The publishable `@thatmyassets/dashboard` npm package bundles the pinned Go/Next.js source, Compose file, Caddyfile, and database migration. It does not download an unpinned source archive.
+The `@thatmyassets/dashboard` package is **not published to the npm registry**, so `npx @thatmyassets/dashboard install` returns `E404`. That command is not required. Download the versioned release bundle and inspect its small setup script before running it:
 
 ```sh
-npx @thatmyassets/dashboard install
+curl -fLO https://github.com/ThatMyAsset/TMA-Dashboard/releases/download/v0.1.0/TMA-Dashboard-Setup.tar.gz
+tar -xzf TMA-Dashboard-Setup.tar.gz
+./TMA-Dashboard-Setup/setup.sh install
 ```
 
-The installer asks for Docker or system mode, origin/ports, administrator credentials with confirmation, database credentials, and an optional automation token. Strong random administrator/database passwords are generated when the corresponding prompt is left blank. The automation token is disabled when blank; answer `generate` to create one. Passwords and tokens are never printed. Retrieve generated bootstrap values from the protected `.env` file and store them securely. Existing administrator passwords are not overwritten by application restarts.
+`setup.sh` checks the bundled SHA-256 checksum, installs the included npm tarball into a temporary directory **without contacting the npm registry**, runs the same interactive installer, and removes the temporary installation when finished. It never installs operating-system packages, Docker, or other runtimes. Missing Node.js 20+, npm, `tar`, or `sha256sum` produces an error with instructions instead.
+
+For a reproducible downloader with archive validation and automatic temporary-file cleanup, inspect [`install.sh`](./install.sh), then run it:
+
+```sh
+curl -fLO https://raw.githubusercontent.com/ThatMyAsset/TMA-Dashboard/v0.1.0/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+Optional release verification uses the separately uploaded `TMA-Dashboard-Setup.tar.gz.sha256` when present; the npm tarball checksum inside the bundle is always checked. Set `TMA_VERSION` to select another published release, for example `TMA_VERSION=0.1.1 ./install.sh`. Direct `npx github:ThatMyAsset/TMA-Dashboard install` is intentionally not recommended: Git dependencies use a source checkout rather than this verified release bundle.
+
+The release installer asks for Docker or system mode, origin/ports, administrator credentials with confirmation, database credentials, and an optional automation token. Strong random administrator/database passwords are generated when the corresponding prompt is left blank. The automation token is disabled when blank; answer `generate` to create one. Passwords and tokens are never printed. Retrieve generated bootstrap values from the protected `.env` file and store them securely. Existing administrator passwords are not overwritten by application restarts.
 
 The default installation directory is `./tma-dashboard`. Docker mode validates Docker, Compose v2, and the daemon before building, writes `.env` atomically with restrictive permissions, starts the stack, and succeeds only after an end-to-end health check. System mode checks Go, Node.js, npm, PostgreSQL, and `psql`; it prints installation links instead of installing global runtimes. It provisions the application role/database idempotently, builds both applications, then starts systemd services on supported root Linux installations or local background processes on Windows, macOS, and non-root Linux. System mode is localhost HTTP only; use Docker/Caddy for public HTTPS.
 
 Preview a plan without creating files, checking dependencies, or executing installation commands:
 
 ```sh
-npx @thatmyassets/dashboard install --dry-run --non-interactive
+./TMA-Dashboard-Setup/setup.sh install --dry-run --non-interactive
 ```
 
 For CI, set secrets through your CI secret store rather than putting them in shell history:
@@ -32,17 +46,17 @@ For CI, set secrets through your CI secret store rather than putting them in she
 export TMA_ADMIN_PASSWORD='a-long-unique-admin-password'
 export TMA_ADMIN_PASSWORD_CONFIRM="$TMA_ADMIN_PASSWORD"
 export TMA_DB_PASSWORD='a_long_unique_database_password'
-npx @thatmyassets/dashboard install --non-interactive --mode docker \
+./TMA-Dashboard-Setup/setup.sh install --non-interactive --mode docker \
   --origin https://dashboard.example.com --install-dir /srv/tma-dashboard
 ```
 
-All options have `TMA_` environment equivalents; run `npx @thatmyassets/dashboard --help` for the complete list. Supplied administrator passwords require matching confirmation in noninteractive mode. Passwords use printable ASCII without quotes, dollar signs, or backslashes so Docker, systemd, and local process environments parse identically. Docker database passwords additionally use only URL-safe letters, numbers, `_`, and `-`.
+All options have `TMA_` environment equivalents; run `./TMA-Dashboard-Setup/setup.sh --help` for the complete list. Supplied administrator passwords require matching confirmation in noninteractive mode. Passwords use printable ASCII without quotes, dollar signs, or backslashes so Docker, systemd, and local process environments parse identically. Docker database passwords additionally use only URL-safe letters, numbers, `_`, and `-`.
 
-Manage a local-process installation with the same package version:
+Keep the extracted bundle to manage a local-process installation with the same package version:
 
 ```sh
-npx @thatmyassets/dashboard start --install-dir ./tma-dashboard
-npx @thatmyassets/dashboard stop --install-dir ./tma-dashboard
+./TMA-Dashboard-Setup/setup.sh start --install-dir ./tma-dashboard
+./TMA-Dashboard-Setup/setup.sh stop --install-dir ./tma-dashboard
 ```
 
 On systemd installations use `sudo systemctl start|stop tma-dashboard.service tma-control-plane.service`. On Docker installations use `docker compose --env-file .env up -d` or `down` from the installation directory. Local stdout/stderr logs are under `logs/`; no secret values are written to them by the installer.
@@ -122,6 +136,9 @@ cd .. && docker compose --env-file .env config --quiet
 npm test
 npm pack --dry-run
 ```
+
+Build a GitHub Release bundle on Ubuntu/Linux with `npm run build:release` so `setup.sh` keeps its executable mode. Upload both `release/TMA-Dashboard-Setup.tar.gz` and `release/TMA-Dashboard-Setup.tar.gz.sha256` to the matching version tag on GitHub Releases. The script runs `npm pack`, injects `package.json`'s version into `setup.sh`, and generates both SHA-256 checksum files; no registry publish is needed.
+
 
 GitHub Actions runs formatting verification, vet, race-enabled Go tests, frontend unit tests, TypeScript checks, production build, Compose validation, installer tests, and an npm package-content dry run.
 
