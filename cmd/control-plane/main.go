@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -75,13 +76,21 @@ func run() error {
 func waitForDatabase(ctx context.Context, storage *store.Store) error {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	var lastErr error
 	for {
-		if err := storage.Ping(ctx); err == nil {
+		pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		err := storage.Ping(pingCtx)
+		cancel()
+		if err == nil {
 			return nil
 		}
+		if lastErr == nil || err.Error() != lastErr.Error() {
+			slog.Warn("PostgreSQL is not ready", "error", err)
+		}
+		lastErr = err
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("PostgreSQL connection failed: %w", lastErr)
 		case <-ticker.C:
 		}
 	}

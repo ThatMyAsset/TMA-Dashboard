@@ -282,6 +282,7 @@ function plan(config) {
 }
 
 async function install(options) {
+  await preserveDockerSecrets(options);
   const config = await collect(options);
   const env = renderEnv(config);
   if (options.dryRun) {
@@ -302,6 +303,16 @@ async function install(options) {
   if (config.adminUsername) console.log(`Administrator: ${config.adminUsername}`);
   console.log("Retrieve generated bootstrap values from .env and store them securely. Existing admin passwords are not replaced on restart.");
 }
+
+async function preserveDockerSecrets(options) {
+  if (options.mode !== "docker") return;
+  const file = path.resolve(options.installDir || "tma-dashboard", ".env");
+  if (!fs.existsSync(file)) return;
+  const previous = parseEnv(await fs.promises.readFile(file, "utf8"));
+  const keys = { POSTGRES_DB: "dbName", POSTGRES_USER: "dbUser", POSTGRES_PASSWORD: "dbPassword", ADMIN_USERNAME: "adminUsername", ADMIN_PASSWORD: "adminPassword", ADMIN_API_TOKEN: "adminApiToken" };
+  for (const [key, option] of Object.entries(keys)) if (previous[key] !== undefined && options[option] === undefined) options[option] = previous[key];
+}
+
 
 async function loadLocal(installDir) {
   const metadataPath = path.join(installDir, "installation.json");
@@ -338,4 +349,4 @@ async function main(argv = process.argv.slice(2)) {
   return stop(options);
 }
 
-module.exports = { main, install, plan, copySource, atomicWrite, systemdUnits, databaseUrl, composeArgs, assertPortsFree };
+module.exports = { main, install, plan, copySource, atomicWrite, systemdUnits, databaseUrl, composeArgs, assertPortsFree, preserveDockerSecrets };

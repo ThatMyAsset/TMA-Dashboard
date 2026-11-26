@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { defaults, validateConfig, renderEnv, parseEnv, redactEnv, parseOrigin } = require("../installer/config.cjs");
 const { parseArguments, collect } = require("../installer/cli.cjs");
-const { main, plan, systemdUnits, atomicWrite, assertPortsFree } = require("../installer/index.cjs");
+const { main, plan, systemdUnits, atomicWrite, assertPortsFree, preserveDockerSecrets } = require("../installer/index.cjs");
 const net = require("node:net");
 
 const passwords = { adminPassword: "correct-horse-battery", adminPasswordConfirm: "correct-horse-battery", dbPassword: "database_password_12345" };
@@ -112,4 +112,15 @@ test("occupied deployment ports fail before any installation files are written",
   await assert.rejects(assertPortsFree(config), new RegExp(`port already in use: ${port}`));
   await assert.rejects(main(["install", "--non-interactive", "--install-dir", installDir, "--web-port", String(port), "--origin", `http://localhost:${port}`, "--admin-password", passwords.adminPassword, "--admin-password-confirm", passwords.adminPasswordConfirm, "--db-password", passwords.dbPassword]), /port already in use/);
   assert.equal(fs.existsSync(installDir), false);
+});
+
+test("existing Docker secrets override regenerated defaults on reinstall", async (context) => {
+  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "tma-preserve-test-"));
+  context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
+  await fs.promises.writeFile(path.join(directory, ".env"), 'POSTGRES_PASSWORD="existing_database_password"\nADMIN_PASSWORD="existing_admin_password"\nADMIN_USERNAME="existingadmin"\n');
+  const options = { mode: "docker", installDir: directory };
+  await preserveDockerSecrets(options);
+  assert.equal(options.dbPassword, "existing_database_password");
+  assert.equal(options.adminPassword, "existing_admin_password");
+  assert.equal(options.adminUsername, "existingadmin");
 });
