@@ -7,7 +7,8 @@ const os = require("node:os");
 const path = require("node:path");
 const { defaults, validateConfig, renderEnv, parseEnv, redactEnv, parseOrigin } = require("../installer/config.cjs");
 const { parseArguments, collect } = require("../installer/cli.cjs");
-const { main, plan, systemdUnits, atomicWrite } = require("../installer/index.cjs");
+const { main, plan, systemdUnits, atomicWrite, assertPortsFree } = require("../installer/index.cjs");
+const net = require("node:net");
 
 const passwords = { adminPassword: "correct-horse-battery", adminPasswordConfirm: "correct-horse-battery", dbPassword: "database_password_12345" };
 
@@ -92,4 +93,17 @@ test("atomic writes replace configuration without leaving temporary files", asyn
   await atomicWrite(file, "second\n");
   assert.equal(await fs.promises.readFile(file, "utf8"), "second\n");
   assert.deepEqual(await fs.promises.readdir(directory), [".env"]);
+});
+
+test("occupied deployment ports fail before any installation files are written", async (context) => {
+  const listener = net.createServer();
+  await new Promise((resolve) => listener.listen(0, "0.0.0.0", resolve));
+  const port = listener.address().port;
+  context.after(() => new Promise((resolve) => listener.close(resolve)));
+  const installDir = path.join(await fs.promises.mkdtemp(path.join(os.tmpdir(), "tma-port-test-")), "installation");
+  context.after(() => fs.promises.rm(path.dirname(installDir), { recursive: true, force: true }));
+  const config = validateConfig(defaults({ ...passwords, installDir, httpsPort: port, origin: `https://localhost:${port}` }));
+  await assert.rejects(assertPortsFree(config), new RegExp(`port already in use: ${port}`));
+  await assert.rejects(main(["install", "--non-interactive", "--install-dir", installDir, "--https-port", String(port), "--origin", `https://localhost:${port}`, "--admin-password", passwords.adminPassword, "--admin-password-confirm", passwords.adminPasswordConfirm, "--db-password", passwords.dbPassword]), /port already in use/);
+  assert.equal(fs.existsSync(installDir), false);
 });

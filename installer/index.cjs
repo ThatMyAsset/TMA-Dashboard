@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+const net = require("node:net");
 const { setTimeout: sleep } = require("node:timers/promises");
 const { parseArguments, collect, packageVersion, HELP } = require("./cli.cjs");
 const { renderEnv, redactEnv, parseEnv } = require("./config.cjs");
@@ -71,6 +72,21 @@ async function copySource(destination) {
 
 function composeArgs(config, ...args) {
   return ["compose", "--env-file", path.join(config.installDir, ".env"), "-f", path.join(config.installDir, "compose.yaml"), ...args];
+}
+async function assertPortsFree(config) {
+  const ports = config.mode === "docker" ? [config.httpPort, config.httpsPort] : [config.webPort, config.controlPlanePort];
+  const busy = [];
+  for (const port of ports) {
+    if (await new Promise((resolve) => {
+      const probe = net.createServer();
+      probe.unref();
+      probe.once("error", () => resolve(true));
+      probe.listen({ port, host: "0.0.0.0", exclusive: true }, () => probe.close(() => resolve(false)));
+    })) busy.push(port);
+  }
+  if (busy.length) {
+    throw new Error(`port already in use: ${busy.join(", ")}. Check with: ss -ltnp | grep -E ':(${busy.join("|")})\\b'. Stop the conflicting service or rerun setup and choose unused ports. Update Public origin and your SSH tunnel to the same HTTPS port.`);
+  }
 }
 
 async function waitForDocker(config) {
@@ -268,6 +284,7 @@ async function install(options) {
     console.log("Dry run only; no files changed and no installation commands executed.");
     return;
   }
+  await assertPortsFree(config);
   await fs.promises.mkdir(config.installDir, { recursive: true, mode: 0o700 });
   await copySource(config.installDir);
   await atomicWrite(path.join(config.installDir, ".env"), env);
@@ -315,4 +332,4 @@ async function main(argv = process.argv.slice(2)) {
   return stop(options);
 }
 
-module.exports = { main, install, plan, copySource, atomicWrite, systemdUnits, databaseUrl, composeArgs };
+module.exports = { main, install, plan, copySource, atomicWrite, systemdUnits, databaseUrl, composeArgs, assertPortsFree };
