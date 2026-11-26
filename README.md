@@ -7,7 +7,7 @@ Production-conscious vertical slice of ThatMyAssets AI data-loss prevention: Go 
 - **Control Plane:** Go 1.23, `net/http`, pgx, bcrypt. Database migrations run at startup under a PostgreSQL advisory lock.
 - **Dashboard:** Next.js 15, React 19, strict TypeScript. All counts, devices, policies, and activity come from the Control Plane; there are no demo records.
 - **Persistence:** PostgreSQL 17. Only SHA-256 hashes of admin session tokens, pairing codes, and device tokens are stored.
-- **Network:** Compose publishes only Next.js on host loopback by default. PostgreSQL and the Control Plane stay on the private Docker network. No bundled reverse proxy or TLS service is required.
+- **Network:** Compose publishes Next.js and the Control Plane on host loopback by default. PostgreSQL stays on the private Docker network. No bundled reverse proxy or TLS service is required.
 
 ## Install from GitHub Releases (Ubuntu/Linux, Node.js 20+)
 
@@ -31,9 +31,9 @@ chmod +x install.sh
 
 Optional release verification uses the separately uploaded `TMA-Dashboard-Setup.tar.gz.sha256` when present; the npm tarball checksum inside the bundle is always checked. Set `TMA_VERSION` to select another published release, for example `TMA_VERSION=0.1.1 ./install.sh`.
 
-The release installer asks for Docker or system mode, the Dashboard HTTP port and browser origin, administrator credentials with confirmation, database credentials, and an optional automation token. Strong random administrator/database passwords are generated when the corresponding prompt is left blank. The automation token is disabled when blank; answer `generate` to create one. Passwords and tokens are never printed. Retrieve generated bootstrap values from the protected `.env` file and store them securely. Existing administrator passwords are not overwritten by application restarts.
+The release installer asks for Docker or system mode, the Dashboard HTTP port and browser origin, administrator credentials with confirmation, database credentials, and an optional automation token. Docker mode publishes the Control Plane on loopback port `18080` by default for Agent enrollment; override it with `--control-plane-port` or `TMA_CONTROL_PLANE_PORT`. Strong random administrator/database passwords are generated when the corresponding prompt is left blank. The automation token is disabled when blank; answer `generate` to create one. Passwords and tokens are never printed. Retrieve generated bootstrap values from the protected `.env` file and store them securely. Existing administrator passwords are not overwritten by application restarts. Reinstalling in Docker mode preserves existing database and administrator credentials from `.env`.
 
-The default installation directory is `./tma-dashboard`. Docker mode validates Docker, Compose v2, and the daemon before building, writes `.env` atomically with restrictive permissions, starts the stack, and succeeds only after direct host Dashboard and internal Control Plane health checks pass. System mode checks Go, Node.js, npm, PostgreSQL, and `psql`; it prints installation links instead of installing global runtimes. It provisions the application role/database idempotently, builds both applications, then starts systemd services on supported root Linux installations or local background processes on Windows, macOS, and non-root Linux. Both modes default to localhost HTTP.
+The default installation directory is `./tma-dashboard`. Docker mode validates Docker, Compose v2, and the daemon before building, writes `.env` atomically with restrictive permissions, starts the stack, and succeeds only after direct host Dashboard and published Control Plane health checks pass. System mode checks Go, Node.js, npm, PostgreSQL, and `psql`; it prints installation links instead of installing global runtimes. It provisions the application role/database idempotently, builds both applications, then starts systemd services on supported root Linux installations or local background processes on Windows, macOS, and non-root Linux. Both modes default to localhost HTTP.
 
 Preview a plan without creating files, checking dependencies, or executing installation commands:
 
@@ -75,7 +75,7 @@ Prerequisites: Docker Engine with Compose v2.
    docker compose --env-file .env up --build -d
    docker compose ps
    curl -f http://127.0.0.1:3000/login
-   docker compose --env-file .env exec -T control-plane wget -q -O /dev/null http://localhost:8080/healthz
+   curl -f http://127.0.0.1:18080/healthz
    ```
 
 4. Open `http://localhost:3000` and sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`. Dashboard binds `127.0.0.1` by default, so a remote VPS needs an SSH tunnel:
@@ -85,6 +85,16 @@ Prerequisites: Docker Engine with Compose v2.
    ```
 
    Keep that tunnel open while browsing `http://localhost:3000`.
+
+### Connect an Agent through SSH
+
+The Control Plane is published as `${CONTROL_PLANE_HOST:-127.0.0.1}:${CONTROL_PLANE_PORT:-18080}:8080`. Keep `CONTROL_PLANE_HOST=127.0.0.1`; no public IP exposure is needed. From the Windows Agent machine, open a reverse tunnel to the VPS and keep it running:
+
+```powershell
+ssh -N -R 18080:127.0.0.1:18080 ubuntu@VPS_IP
+```
+
+Replace `VPS_IP` with the VPS address. In the Agent, use exactly `http://localhost:18080` as the Control Plane URL. The browser extension also requires its local Native Messaging host installation separately; the SSH tunnel does not install or configure Native Messaging.
 
 The initial administrator and default policy are created only when absent. Changing `ADMIN_PASSWORD` after the first start does **not** overwrite an existing administrator password. Destroying the PostgreSQL volume resets all local data:
 
@@ -104,7 +114,7 @@ COOKIE_SECURE=true
 TRUST_PROXY=true
 ```
 
-Keep `DASHBOARD_HOST=127.0.0.1` when the proxy runs on the same host. Changing `DASHBOARD_HOST` to a non-loopback address exposes unencrypted HTTP and is unsafe unless a trusted network boundary protects it. PostgreSQL and the Control Plane remain unpublished. Use a secrets manager rather than committing `.env`.
+Keep `DASHBOARD_HOST=127.0.0.1` and `CONTROL_PLANE_HOST=127.0.0.1` when the proxy runs on the same host. Changing either host to a non-loopback address exposes unencrypted HTTP and is unsafe unless a trusted network boundary protects it. PostgreSQL remains unpublished. Use a secrets manager rather than committing `.env`.
 
 ## Local development
 

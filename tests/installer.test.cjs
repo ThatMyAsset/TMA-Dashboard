@@ -21,6 +21,8 @@ test("noninteractive arguments and environment create a valid configuration", as
   const dockerEnv = parseEnv(renderEnv(config));
   assert.equal(dockerEnv.WEB_PORT, "3100");
   assert.equal(dockerEnv.DASHBOARD_HOST, "127.0.0.1");
+  assert.equal(dockerEnv.CONTROL_PLANE_HOST, "127.0.0.1");
+  assert.equal(dockerEnv.CONTROL_PLANE_PORT, "18080");
   assert.equal(dockerEnv.ALLOWED_ORIGINS, "http://localhost:3100");
   assert.equal(dockerEnv.COOKIE_SECURE, "false");
   assert.equal(dockerEnv.TRUST_PROXY, "false");
@@ -89,6 +91,7 @@ test("plans and systemd units contain real build and startup commands", () => {
   assert.match(posixUnits["tma-control-plane.service"], /ExecStart="\/srv\/tma dashboard\/bin\/control-plane"/);
   assert.match(posixUnits["tma-dashboard.service"], /EnvironmentFile="\/srv\/tma dashboard\/\.env"/);
   assert.match(units["tma-dashboard.service"], /next.* start/);
+  assert.ok(plan(validateConfig(defaults({ ...passwords }))).steps.some((step) => step.includes("published Control Plane :18080/healthz")));
 });
 
 test("atomic writes replace configuration without leaving temporary files", async (context) => {

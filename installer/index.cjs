@@ -74,7 +74,7 @@ function composeArgs(config, ...args) {
   return ["compose", "--env-file", path.join(config.installDir, ".env"), "-f", path.join(config.installDir, "compose.yaml"), ...args];
 }
 async function assertPortsFree(config) {
-  const ports = config.mode === "docker" ? [config.webPort] : [config.webPort, config.controlPlanePort];
+  const ports = [config.webPort, config.controlPlanePort];
   const busy = [];
   for (const port of ports) {
     if (await new Promise((resolve) => {
@@ -94,7 +94,8 @@ async function waitForDocker(config) {
   let lastError = "services are not ready";
   while (Date.now() < deadline) {
     try {
-      await run("docker", composeArgs(config, "exec", "-T", "control-plane", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"), { cwd: config.installDir, capture: true });
+      const api = await fetch(`http://127.0.0.1:${config.controlPlanePort}/healthz`, { signal: AbortSignal.timeout(3000) });
+      if (api.status !== 200) throw new Error(`published Control Plane returned HTTP ${api.status}`);
       const ui = await fetch(`http://127.0.0.1:${config.webPort}/login`, { signal: AbortSignal.timeout(3000) });
       if (ui.status !== 200) throw new Error(`published Dashboard returned HTTP ${ui.status}`);
       if (config.secureCookies) {
@@ -270,7 +271,7 @@ async function installSystem(config, requestedService) {
 function plan(config) {
   const commands = config.mode === "docker" ? [
     "docker compose --env-file .env up --build -d",
-    `Require host Dashboard :${config.webPort}/login and internal Control Plane /healthz to return HTTP 200${config.secureCookies ? `, plus trusted HTTPS proxy ${config.origin}/login` : ""}`,
+    `Require host Dashboard :${config.webPort}/login and published Control Plane :${config.controlPlanePort}/healthz to return HTTP 200${config.secureCookies ? `, plus trusted HTTPS proxy ${config.origin}/login` : ""}`,
   ] : [
     "Configure PostgreSQL role/database with psql",
     "go build -trimpath -o bin/control-plane ./cmd/control-plane",
@@ -302,6 +303,11 @@ async function install(options) {
   console.log(`Configuration: ${path.join(config.installDir, ".env")} (secrets not displayed)`);
   if (config.adminUsername) console.log(`Administrator: ${config.adminUsername}`);
   console.log("Retrieve generated bootstrap values from .env and store them securely. Existing admin passwords are not replaced on restart.");
+  if (config.mode === "docker") {
+    console.log(`Agent Control Plane URL after opening the SSH reverse tunnel: http://localhost:${config.controlPlanePort}`);
+    console.log(`On Windows Agent: ssh -N -R ${config.controlPlanePort}:127.0.0.1:${config.controlPlanePort} ubuntu@VPS_IP`);
+    console.log("The browser extension requires its local Native Messaging setup separately.");
+  }
 }
 
 async function preserveDockerSecrets(options) {
