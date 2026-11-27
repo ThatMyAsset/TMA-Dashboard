@@ -352,7 +352,10 @@ func (s *Store) DeletePolicy(ctx context.Context, version string) error {
 		return ErrConflict
 	}
 	var referenced bool
-	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM devices WHERE policy_version=$1) OR EXISTS(SELECT 1 FROM events WHERE event->>'policy_version'=$1)`, version).Scan(&referenced); err != nil {
+	// policy_version is UUID in devices but JSON text in event.event. Keep the
+	// parameter types explicit so PostgreSQL does not infer UUID for both sides
+	// and fail with "operator does not exist: text = uuid" (500 on delete).
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM devices WHERE policy_version=$1::uuid) OR EXISTS(SELECT 1 FROM events WHERE event->>'policy_version'=$2::text)`, version, version).Scan(&referenced); err != nil {
 		return err
 	}
 	if referenced {

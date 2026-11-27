@@ -18,7 +18,7 @@ export function LoadingState() {
 }
 
 export function ErrorState({ message, retry }: { message: string; retry: () => void }) {
-  return <div className="error-state" role="alert"><div><strong>Control plane unavailable</strong><p>{message}</p></div><button className="button button--secondary" onClick={retry}><Icon name="refresh" size={17} />Retry request</button></div>;
+  return <div className="error-state" role="alert"><div><strong>Request could not be completed</strong><p>{message}</p></div><button className="button button--secondary" onClick={retry}><Icon name="refresh" size={17} />Retry request</button></div>;
 }
 
 export function shortId(id: string) { return `${id.slice(0, 8)}…`; }

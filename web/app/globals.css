@@ -230,6 +230,9 @@ tbody tr:hover { background: #fafcfc; }
 .rule-list { display: grid; gap: 14px; padding: 0 22px 22px; }
 .rule-editor { border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 0; min-width: 0; }
 .rule-editor:disabled { opacity: .6; }
+.rule-advanced { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 12px; }
+.rule-advanced > summary { color: var(--accent); cursor: pointer; font-size: 14px; font-weight: 650; }
+.rule-advanced[open] > .rule-grid { padding-top: 14px; }
 .rule-title { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .rule-number { margin-right: auto; color: var(--muted); font-size: 13px; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
