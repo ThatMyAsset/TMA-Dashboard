@@ -104,8 +104,6 @@ function renderEnv(config) {
     ADMIN_USERNAME: config.adminUsername,
     ADMIN_PASSWORD: config.adminPassword,
     ADMIN_API_TOKEN: config.adminApiToken,
-    DASHBOARD_HOST: config.mode === "docker" ? "0.0.0.0" : "127.0.0.1",
-    CONTROL_PLANE_HOST: config.mode === "docker" ? "0.0.0.0" : "127.0.0.1",
     CONTROL_PLANE_PORT: String(config.controlPlanePort),
     WEB_PORT: String(config.webPort),
     ALLOWED_ORIGINS: config.origin,
