@@ -25,11 +25,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-tma}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tma}?sslmode=disable
       LISTEN_ADDR: :8080
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
-      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
