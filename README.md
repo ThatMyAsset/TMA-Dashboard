@@ -48,7 +48,7 @@ export TMA_ADMIN_PASSWORD='a-long-unique-admin-password'
 export TMA_ADMIN_PASSWORD_CONFIRM="$TMA_ADMIN_PASSWORD"
 export TMA_DB_PASSWORD='a_long_unique_database_password'
 ./TMA-Dashboard-Setup/setup.sh install --non-interactive --mode docker \
-  --web-port 3000 --origin http://localhost:3000 --install-dir /srv/tma-dashboard
+  --web-port 3000 --origin http://VPS_IP:3000 --install-dir /srv/tma-dashboard
 ```
 
 All options have `TMA_` environment equivalents; run `./TMA-Dashboard-Setup/setup.sh --help` for the complete list. Supplied administrator passwords require matching confirmation in noninteractive mode. Passwords use printable ASCII without quotes, dollar signs, or backslashes so Docker, systemd, and local process environments parse identically. Docker database passwords additionally use only URL-safe letters, numbers, `_`, and `-`.
@@ -60,7 +60,7 @@ Keep the extracted bundle to manage a local-process installation with the same p
 ./TMA-Dashboard-Setup/setup.sh stop --install-dir ./tma-dashboard
 ```
 
-On systemd installations use `sudo systemctl start|stop tma-dashboard.service tma-control-plane.service`. On Docker installations use `docker compose --env-file .env up -d` or `down` from the installation directory. Local stdout/stderr logs are under `logs/`; no secret values are written to them by the installer. For noninteractive Docker installs, `--origin http://localhost:PORT` sets the exact browser origin and must use the same port as `--web-port`.
+On systemd installations use `sudo systemctl start|stop tma-dashboard.service tma-control-plane.service`. On Docker installations use `docker compose --env-file .env up -d` or `down` from the installation directory. Local stdout/stderr logs are under `logs/`; no secret values are written to them by the installer. For noninteractive Docker installs, `--origin http://VPS_IP:PORT` sets the exact browser origin and must use the same port as `--web-port`. Use `--origin '*'` to allow any browser origin in a disposable lab.
 
 
 ## Run with Docker Compose
@@ -68,7 +68,7 @@ On systemd installations use `sudo systemctl start|stop tma-dashboard.service tm
 Prerequisites: Docker Engine with Compose v2.
 
 1. Copy `.env.example` to `.env`.
-2. Replace both passwords. `ADMIN_PASSWORD` must contain 12–72 bytes. Optionally set a random 32+ character `ADMIN_API_TOKEN` for automation.
+2. Replace both passwords and replace `VPS_IP` in `ALLOWED_ORIGINS` with the server IP. `ADMIN_PASSWORD` must contain 12–72 bytes. Optionally set a random 32+ character `ADMIN_API_TOKEN` for automation.
 3. Start the stack:
 
    ```sh
@@ -79,6 +79,8 @@ Prerequisites: Docker Engine with Compose v2.
    ```
 
 4. For lab access, open `http://VPS_IP:3000` and sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
+
+Compose lab mode sets `DEV_ALLOW_ALL_ORIGINS=true` by default, so a changed hostname or IP does not break login. The Next.js proxy forwards the browser `Origin` unchanged. Set `ALLOWED_ORIGINS` to one or more comma-separated exact origins and `DEV_ALLOW_ALL_ORIGINS=false` to restrict mutations. `ALLOWED_ORIGINS=*` also enables the lab wildcard. Authentication, device tokens, and real database-backed health checks remain enabled. Reinstalls reuse existing database/admin credentials and origin/port settings from `.env`.
 
 ### Connect an Agent from Windows
 
@@ -104,6 +106,7 @@ Do not expose plain HTTP Dashboard publicly. Public HTTPS requires a separately 
 
 ```dotenv
 ALLOWED_ORIGINS=https://dashboard.example.com
+DEV_ALLOW_ALL_ORIGINS=false
 COOKIE_SECURE=true
 TRUST_PROXY=true
 ```
@@ -136,7 +139,7 @@ npm ci
 CONTROL_PLANE_URL=http://127.0.0.1:8080 npm run dev
 ```
 
-Open `http://localhost:3000`. The Next.js same-origin route forwards only browser cookies and JSON requests to the Control Plane; it does not expose the database or accept an admin bearer token from browser JavaScript.
+Open `http://localhost:3000`. The Next.js same-origin route forwards browser cookies, JSON requests, and the original `Origin` header to the Control Plane; it does not expose the database or accept an admin bearer token from browser JavaScript. Direct system development defaults to exact/same-origin checks; `DEV_ALLOW_ALL_ORIGINS` defaults to false outside Docker lab mode.
 
 ## Verify
 

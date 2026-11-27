@@ -10,14 +10,15 @@ import (
 )
 
 type Config struct {
-	ListenAddr     string
-	AdminUsername  string
-	AdminPassword  string
-	AdminAPIToken  string
-	SecureCookies  bool
-	TrustProxy     bool
-	AllowedOrigins map[string]bool
-	SessionTTL     time.Duration
+	ListenAddr      string
+	AdminUsername   string
+	AdminPassword   string
+	AdminAPIToken   string
+	SecureCookies   bool
+	TrustProxy      bool
+	AllowedOrigins  map[string]bool
+	AllowAllOrigins bool
+	SessionTTL      time.Duration
 }
 
 func ConfigFromEnv() (Config, error) {
@@ -29,10 +30,18 @@ func ConfigFromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	allowAllOrigins, err := envBool("DEV_ALLOW_ALL_ORIGINS", false)
+	if err != nil {
+		return Config{}, err
+	}
 	origins := map[string]bool{}
 	for _, raw := range strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",") {
 		raw = strings.TrimSpace(raw)
 		if raw == "" {
+			continue
+		}
+		if raw == "*" {
+			allowAllOrigins = true
 			continue
 		}
 		u, err := url.Parse(raw)
@@ -44,7 +53,7 @@ func ConfigFromEnv() (Config, error) {
 	cfg := Config{
 		ListenAddr: envDefault("LISTEN_ADDR", ":8080"), AdminUsername: strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_USERNAME"))),
 		AdminPassword: os.Getenv("ADMIN_PASSWORD"), AdminAPIToken: os.Getenv("ADMIN_API_TOKEN"), SecureCookies: secure,
-		TrustProxy: trustProxy, AllowedOrigins: origins, SessionTTL: 8 * time.Hour,
+		TrustProxy: trustProxy, AllowedOrigins: origins, AllowAllOrigins: allowAllOrigins, SessionTTL: 8 * time.Hour,
 	}
 	if cfg.AdminUsername == "" || len(cfg.AdminPassword) < 12 {
 		return Config{}, errors.New("ADMIN_USERNAME is required and ADMIN_PASSWORD must contain at least 12 characters")

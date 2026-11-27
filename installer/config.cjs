@@ -12,6 +12,11 @@ const integer = (value, name) => {
   return number;
 };
 
+function parseOrigins(value) {
+  if (value.trim() === "*") return "*";
+  return [...new Set(value.split(",").map((origin) => parseOrigin(origin.trim())))].join(",");
+}
+
 function parseOrigin(value) {
   let origin;
   try { origin = new URL(value); } catch { throw new Error("origin must be an absolute HTTP(S) URL"); }
@@ -37,22 +42,21 @@ function validateConfig(config) {
   if (!["docker", "system"].includes(config.mode)) throw new Error("mode must be docker or system");
   if (!config.installDir || /[\0\r\n]/.test(config.installDir)) throw new Error("install directory is invalid");
   config.installDir = path.resolve(config.installDir);
-  config.origin = parseOrigin(config.origin);
-  const parsed = new URL(config.origin);
-  config.secureCookies = parsed.protocol === "https:";
+  config.origin = parseOrigins(config.origin);
+  const parsed = new URL(config.origin === "*" ? `http://VPS_IP:${config.webPort}` : config.origin.split(",")[0]);
+  config.secureCookies = config.origin !== "*" && parsed.protocol === "https:";
+  if (config.mode === "system" && config.origin === "*") throw new Error("wildcard origin is available only in Docker lab mode");
   config.webPort = integer(config.webPort, "Dashboard port");
   config.controlPlanePort = integer(config.controlPlanePort, "Control Plane port");
   config.dbPort = integer(config.dbPort, "PostgreSQL port");
   if (new Set([config.webPort, config.controlPlanePort]).size !== 2) throw new Error("web and Control Plane ports must differ");
   if (config.mode === "system" && config.secureCookies) throw new Error("system mode serves local HTTP only");
   if ((config.mode === "system" || !config.secureCookies) && Number(parsed.port || (parsed.protocol === "http:" ? 80 : 443)) !== config.webPort) throw new Error("origin port must match the Dashboard port");
-  if (config.mode === "docker" && !config.secureCookies) console.warn("WARNING: HTTP lab mode has no TLS. Dashboard and Control Plane bind to 0.0.0.0. Restrict VPS firewall/security group to your IP; do not use for production data.");
   if (!/^[a-z][a-z0-9_]{0,62}$/.test(config.adminUsername)) throw new Error("admin username must start with a lowercase letter and contain only lowercase letters, numbers, and underscores");
   validateSecret(config.adminPassword, "admin password");
   validateSecret(config.dbPassword, "database password", 16, 128);
   if (config.mode === "docker" && !/^[A-Za-z0-9_-]+$/.test(config.dbPassword)) throw new Error("Docker database password must use URL-safe letters, numbers, underscores, or hyphens");
   if (config.adminApiToken && !/^[A-Za-z0-9_-]{32,256}$/.test(config.adminApiToken)) throw new Error("admin API token must contain 32–256 URL-safe characters, or be empty");
-  if (config.mode === "system" && !config.secureCookies) console.warn("WARNING: local HTTP mode sends credentials without TLS. Keep it on localhost or place a trusted HTTPS reverse proxy in front before remote use.");
   if (!/^[a-z][a-z0-9_]{0,62}$/.test(config.dbName)) throw new Error("database name must start with a lowercase letter and contain only lowercase letters, numbers, and underscores");
   if (!/^[a-z][a-z0-9_]{0,62}$/.test(config.dbUser)) throw new Error("database user must start with a lowercase letter and contain only lowercase letters, numbers, and underscores");
   if (!/^[a-z0-9.-]+$|^\[[0-9a-f:]+\]$/i.test(config.dbHost)) throw new Error("database host is invalid");
@@ -105,6 +109,7 @@ function renderEnv(config) {
     CONTROL_PLANE_PORT: String(config.controlPlanePort),
     WEB_PORT: String(config.webPort),
     ALLOWED_ORIGINS: config.origin,
+    DEV_ALLOW_ALL_ORIGINS: String(config.mode === "docker" && !config.secureCookies),
     COOKIE_SECURE: String(config.secureCookies),
     TRUST_PROXY: String(config.secureCookies),
   };
@@ -124,7 +129,10 @@ function parseEnv(text) {
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
     const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
     if (!match) throw new Error(`invalid environment file at line ${index + 1}`);
-    try { result[match[1]] = JSON.parse(match[2]); } catch { result[match[1]] = match[2]; }
+    try { result[match[1]] = JSON.parse(match[2]); } catch {
+      const value = match[2].trim();
+      result[match[1]] = value.startsWith("'") && value.endsWith("'") ? value.slice(1, -1) : value;
+    }
   }
   return result;
 }
@@ -136,4 +144,4 @@ function redactEnv(text) {
   }).join("\n");
 }
 
-module.exports = { defaults, validateConfig, validateSecret, parseOrigin, renderEnv, parseEnv, redactEnv, secret, integer };
+module.exports = { defaults, validateConfig, validateSecret, parseOrigin, parseOrigins, renderEnv, parseEnv, redactEnv, secret, integer };

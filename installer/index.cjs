@@ -85,7 +85,7 @@ async function assertPortsFree(config) {
     })) busy.push(port);
   }
   if (busy.length) {
-    throw new Error(`port already in use: ${busy.join(", ")}. Check with: ss -ltnp | grep -E ':(${busy.join("|")})\\b'. Stop the conflicting service or rerun setup and choose unused ports. Update the browser origin and SSH tunnel to use the same Dashboard port.`);
+      throw new Error(`port already in use: ${busy.join(", ")}. Check with: ss -ltnp | grep -E ':(${busy.join("|")})\\b'. Stop the conflicting service or rerun setup and choose unused ports. Update the browser origin to use the same Dashboard port.`);
   }
 }
 
@@ -304,20 +304,24 @@ async function install(options) {
   if (config.adminUsername) console.log(`Administrator: ${config.adminUsername}`);
   console.log("Retrieve generated bootstrap values from .env and store them securely. Existing admin passwords are not replaced on restart.");
   if (config.mode === "docker") {
-    const agentOrigin = new URL(config.origin);
-    agentOrigin.port = String(config.controlPlanePort);
-    console.log(`Agent Control Plane URL: ${agentOrigin.origin}`);
+    if (config.origin === "*") {
+      console.log(`Agent Control Plane URL: http://VPS_IP:${config.controlPlanePort} (replace VPS_IP)`);
+    } else {
+      const agentOrigin = new URL(config.origin.split(",")[0]);
+      agentOrigin.port = String(config.controlPlanePort);
+      console.log(`Agent Control Plane URL: ${agentOrigin.origin}`);
+    }
     console.log("Open firewall/security-group access to this port only from your lab IP.");
     console.log("The browser extension requires its local Native Messaging setup separately.");
   }
 }
 
 async function preserveDockerSecrets(options) {
-  if (options.mode !== "docker") return;
+  if ((options.mode || "docker") !== "docker") return;
   const file = path.resolve(options.installDir || "tma-dashboard", ".env");
   if (!fs.existsSync(file)) return;
   const previous = parseEnv(await fs.promises.readFile(file, "utf8"));
-  const keys = { POSTGRES_DB: "dbName", POSTGRES_USER: "dbUser", POSTGRES_PASSWORD: "dbPassword", ADMIN_USERNAME: "adminUsername", ADMIN_PASSWORD: "adminPassword", ADMIN_API_TOKEN: "adminApiToken" };
+  const keys = { POSTGRES_DB: "dbName", POSTGRES_USER: "dbUser", POSTGRES_PASSWORD: "dbPassword", ADMIN_USERNAME: "adminUsername", ADMIN_PASSWORD: "adminPassword", ADMIN_API_TOKEN: "adminApiToken", ALLOWED_ORIGINS: "origin", WEB_PORT: "webPort", CONTROL_PLANE_PORT: "controlPlanePort" };
   for (const [key, option] of Object.entries(keys)) if (previous[key] !== undefined && options[option] === undefined) options[option] = previous[key];
 }
 

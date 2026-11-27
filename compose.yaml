@@ -30,7 +30,8 @@ services:
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       TRUST_PROXY: ${TRUST_PROXY:-false}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:${WEB_PORT:-3000}}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      DEV_ALLOW_ALL_ORIGINS: ${DEV_ALLOW_ALL_ORIGINS:-true}
     depends_on:
       postgres:
         condition: service_healthy

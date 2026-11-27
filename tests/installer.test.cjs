@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { defaults, validateConfig, renderEnv, parseEnv, redactEnv, parseOrigin } = require("../installer/config.cjs");
+const { defaults, validateConfig, renderEnv, parseEnv, redactEnv, parseOrigin, parseOrigins } = require("../installer/config.cjs");
 const { parseArguments, collect } = require("../installer/cli.cjs");
 const { main, plan, systemdUnits, atomicWrite, assertPortsFree, preserveDockerSecrets } = require("../installer/index.cjs");
 const net = require("node:net");
@@ -26,6 +26,7 @@ test("noninteractive arguments and environment create a valid configuration", as
   assert.equal(dockerEnv.ALLOWED_ORIGINS, "http://localhost:3100");
   assert.equal(dockerEnv.COOKIE_SECURE, "false");
   assert.equal(dockerEnv.TRUST_PROXY, "false");
+  assert.equal(dockerEnv.DEV_ALLOW_ALL_ORIGINS, "true");
 
   const env = parseArguments(["install"], { CI: "true", TMA_MODE: "system", TMA_ORIGIN: "http://localhost:3100", TMA_WEB_PORT: "3100", TMA_ADMIN_NAME: "operator" });
   assert.equal(env.options.nonInteractive, true);
@@ -48,6 +49,13 @@ test("origins, ports, identifiers, and Docker database passwords are validated",
   assert.equal(validateConfig(defaults({ ...passwords, mode: "docker", origin: "https://dashboard.example.com" })).secureCookies, true);
   assert.equal(parseOrigin("http://203.0.113.10:3000"), "http://203.0.113.10:3000");
   assert.throws(() => parseOrigin("http://dashboard.example.com"), /IP address/);
+  assert.equal(parseOrigins("http://203.0.113.10:3000,http://203.0.113.10:3000"), "http://203.0.113.10:3000");
+  assert.equal(parseOrigins("*"), "*");
+  const wildcard = parseEnv(renderEnv(validateConfig(defaults({ ...passwords, origin: "*" }))));
+  assert.equal(wildcard.ALLOWED_ORIGINS, "*");
+  assert.equal(wildcard.DEV_ALLOW_ALL_ORIGINS, "true");
+  assert.equal(parseEnv(renderEnv(validateConfig(defaults({ ...passwords, mode: "system" })))).DEV_ALLOW_ALL_ORIGINS, "false");
+  assert.deepEqual(parseEnv("ALLOWED_ORIGINS='http://203.0.113.10:3000'\n"), { ALLOWED_ORIGINS: "http://203.0.113.10:3000" });
 });
 
 test("environment rendering round-trips and URL-encodes system credentials", () => {
@@ -128,4 +136,9 @@ test("existing Docker secrets override regenerated defaults on reinstall", async
   assert.equal(options.dbPassword, "existing_database_password");
   assert.equal(options.adminPassword, "existing_admin_password");
   assert.equal(options.adminUsername, "existingadmin");
+  await fs.promises.writeFile(path.join(directory, ".env"), 'ALLOWED_ORIGINS="http://203.0.113.10:3000"\nWEB_PORT="3000"\nCONTROL_PLANE_PORT="18080"\n');
+  await preserveDockerSecrets(options);
+  assert.equal(options.origin, "http://203.0.113.10:3000");
+  assert.equal(options.webPort, "3000");
+  assert.equal(options.controlPlanePort, "18080");
 });

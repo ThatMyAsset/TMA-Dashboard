@@ -84,6 +84,9 @@ type adminKey struct{}
 
 func (s *Server) validOrigin(r *http.Request, automation bool) bool {
 	origin := r.Header.Get("Origin")
+	if origin != "" && s.cfg.AllowAllOrigins {
+		return true
+	}
 	if origin == "" {
 		return automation
 	}
