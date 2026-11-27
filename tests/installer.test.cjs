@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { defaults, validateConfig, renderEnv, parseEnv, redactEnv, parseOrigin, parseOrigins } = require("../installer/config.cjs");
 const { parseArguments, collect } = require("../installer/cli.cjs");
-const { main, plan, systemdUnits, atomicWrite, assertPortsFree, preserveDockerSecrets } = require("../installer/index.cjs");
+const { main, plan, systemdUnits, atomicWrite, assertPortsFree, preserveDockerSecrets, composeEnvironment } = require("../installer/index.cjs");
 const net = require("node:net");
 
 const passwords = { adminPassword: "correct-horse-battery", adminPasswordConfirm: "correct-horse-battery", dbPassword: "database_password_12345" };
@@ -20,8 +20,8 @@ test("noninteractive arguments and environment create a valid configuration", as
   assert.equal(config.origin, "http://localhost:3100");
   const dockerEnv = parseEnv(renderEnv(config));
   assert.equal(dockerEnv.WEB_PORT, "3100");
-  assert.equal(dockerEnv.DASHBOARD_HOST, "0.0.0.0");
-  assert.equal(dockerEnv.CONTROL_PLANE_HOST, "0.0.0.0");
+  assert.equal(Object.hasOwn(dockerEnv, "DASHBOARD_HOST"), false);
+  assert.equal(Object.hasOwn(dockerEnv, "CONTROL_PLANE_HOST"), false);
   assert.equal(dockerEnv.CONTROL_PLANE_PORT, "18080");
   assert.equal(dockerEnv.ALLOWED_ORIGINS, "http://localhost:3100");
   assert.equal(dockerEnv.COOKIE_SECURE, "false");
@@ -141,4 +141,29 @@ test("existing Docker secrets override regenerated defaults on reinstall", async
   assert.equal(options.origin, "http://203.0.113.10:3000");
   assert.equal(options.webPort, "3000");
   assert.equal(options.controlPlanePort, "18080");
+});
+
+
+test("Docker Compose ignores inherited installer and Compose overrides", async (context) => {
+  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "tma-compose-env-test-"));
+  context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
+  await fs.promises.writeFile(path.join(directory, ".env"), 'ALLOWED_ORIGINS="http://43.157.201.52:3000"\nWEB_PORT="3000"\nCONTROL_PLANE_PORT="18080"\n');
+  const config = { installDir: directory };
+  const inherited = {
+    PATH: process.env.PATH,
+    ALLOWED_ORIGINS: "http://localhost:3000",
+    WEB_PORT: "9999",
+    CONTROL_PLANE_PORT: "9998",
+    DASHBOARD_HOST: "127.0.0.1",
+    COMPOSE_FILE: "compose.override.yaml",
+    COMPOSE_PROJECT_NAME: "wrong-project",
+  };
+  const clean = composeEnvironment(config, inherited);
+  assert.equal(clean.ALLOWED_ORIGINS, undefined);
+  assert.equal(clean.WEB_PORT, undefined);
+  assert.equal(clean.CONTROL_PLANE_PORT, undefined);
+  assert.equal(clean.DASHBOARD_HOST, undefined);
+  assert.equal(clean.COMPOSE_FILE, undefined);
+  assert.equal(clean.COMPOSE_PROJECT_NAME, undefined);
+  assert.equal(clean.PATH, process.env.PATH);
 });
