@@ -20,6 +20,7 @@ test("noninteractive arguments and environment create a valid configuration", as
   assert.equal(config.origin, "http://localhost:3100");
   const dockerEnv = parseEnv(renderEnv(config));
   assert.equal(dockerEnv.WEB_PORT, "3100");
+  assert.equal(dockerEnv.DATABASE_URL, "postgres://tma:database_password_12345@postgres:5432/tma?sslmode=disable");
   assert.equal(Object.hasOwn(dockerEnv, "DASHBOARD_HOST"), false);
   assert.equal(Object.hasOwn(dockerEnv, "CONTROL_PLANE_HOST"), false);
   assert.equal(dockerEnv.CONTROL_PLANE_PORT, "18080");
