@@ -88,8 +88,25 @@ function composeEnvironment(config, inherited = process.env) {
   }
   return env;
 }
-async function assertPortsFree(config) {
-  const ports = [config.webPort, config.controlPlanePort];
+function ownedPublishedPorts(output, ports) {
+  return ports.filter((port) => output.includes(`:${port}->`));
+}
+
+async function assertInstallPortsFree(config) {
+  let ownedPorts = [];
+  if (config.mode === "docker") {
+    try {
+      const output = await run("docker", ["ps", "--format", "{{.Ports}}", "--filter", "label=com.docker.compose.project=tma-dashboard"], { capture: true });
+      ownedPorts = ownedPublishedPorts(output, [config.webPort, config.controlPlanePort]);
+    } catch {
+      // Docker availability is checked by installDocker; a failed probe must not hide port conflicts.
+    }
+  }
+  await assertPortsFree(config, ownedPorts);
+}
+
+async function assertPortsFree(config, ignoredPorts = []) {
+  const ports = [config.webPort, config.controlPlanePort].filter((port) => !ignoredPorts.includes(port));
   const busy = [];
   for (const port of ports) {
     if (await new Promise((resolve) => {
@@ -307,7 +324,7 @@ async function install(options) {
     console.log("Dry run only; no files changed and no installation commands executed.");
     return;
   }
-  await assertPortsFree(config);
+  await assertInstallPortsFree(config);
   await fs.promises.mkdir(config.installDir, { recursive: true, mode: 0o700 });
   await copySource(config.installDir);
   await atomicWrite(path.join(config.installDir, ".env"), env);
@@ -379,4 +396,4 @@ async function main(argv = process.argv.slice(2)) {
   return stop(options);
 }
 
-module.exports = { main, install, plan, copySource, atomicWrite, systemdUnits, databaseUrl, composeArgs, composeEnvironment, assertPortsFree, preserveDockerSecrets };
+module.exports = { main, install, plan, copySource, atomicWrite, systemdUnits, databaseUrl, composeArgs, composeEnvironment, assertPortsFree, assertInstallPortsFree, ownedPublishedPorts, preserveDockerSecrets };

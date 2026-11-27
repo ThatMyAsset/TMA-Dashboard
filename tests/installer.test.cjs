@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { defaults, validateConfig, renderEnv, renderPostgresEnv, parseEnv, redactEnv, parseOrigin, parseOrigins } = require("../installer/config.cjs");
 const { parseArguments, collect } = require("../installer/cli.cjs");
-const { main, plan, systemdUnits, atomicWrite, assertPortsFree, preserveDockerSecrets, composeEnvironment } = require("../installer/index.cjs");
+const { main, plan, systemdUnits, atomicWrite, assertPortsFree, preserveDockerSecrets, composeEnvironment, ownedPublishedPorts } = require("../installer/index.cjs");
 const net = require("node:net");
 
 const passwords = { adminPassword: "correct-horse-battery", adminPasswordConfirm: "correct-horse-battery", dbPassword: "database_password_12345" };
@@ -180,4 +180,12 @@ test("Control Plane runtime settings come from the install env file, not shell i
   for (const key of ["DATABASE_URL", "ADMIN_USERNAME", "ADMIN_PASSWORD", "ADMIN_API_TOKEN", "ALLOWED_ORIGINS", "DEV_ALLOW_ALL_ORIGINS", "COOKIE_SECURE", "TRUST_PROXY", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"]) {
     assert.equal(compose.includes(key + ": ${"), false, `${key} must come from env_file`);
   }
+});
+
+
+test("reinstall ignores ports already published by the existing Dashboard Compose project", () => {
+  const published = "0.0.0.0:3000->3000/tcp, 0.0.0.0:18080->8080/tcp";
+  assert.deepEqual(ownedPublishedPorts(published, [3000, 18080]), [3000, 18080]);
+  assert.deepEqual(ownedPublishedPorts(published, [3000, 18080, 19000]), [3000, 18080]);
+  assert.deepEqual(ownedPublishedPorts("127.0.0.1:3000->3000/tcp", [3000, 18080]), [3000]);
 });
