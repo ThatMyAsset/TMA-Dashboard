@@ -4,7 +4,7 @@ const { randomBytes } = require("node:crypto");
 const net = require("node:net");
 const path = require("node:path");
 
-const SECRET_KEYS = new Set(["ADMIN_PASSWORD", "POSTGRES_PASSWORD", "ADMIN_API_TOKEN", "DATABASE_URL", "DB_ADMIN_URL"]);
+const SECRET_KEYS = new Set(["ADMIN_PASSWORD", "POSTGRES_PASSWORD", "ADMIN_API_TOKEN", "PAIRING_CODE_KEY", "DATABASE_URL", "DB_ADMIN_URL"]);
 const secret = (bytes = 32) => randomBytes(bytes).toString("base64url");
 const integer = (value, name) => {
   const number = Number(value);
@@ -87,6 +87,7 @@ function defaults(options = {}) {
     adminUsername: options.adminUsername || "admin",
     adminPassword: options.adminPassword || secret(24),
     adminApiToken: options.adminApiToken || "",
+    pairingCodeKey: options.pairingCodeKey || secret(),
   };
 }
 
@@ -104,6 +105,7 @@ function renderEnv(config) {
     ADMIN_USERNAME: config.adminUsername,
     ADMIN_PASSWORD: config.adminPassword,
     ADMIN_API_TOKEN: config.adminApiToken,
+    PAIRING_CODE_KEY: config.pairingCodeKey,
     CONTROL_PLANE_PORT: String(config.controlPlanePort),
     WEB_PORT: String(config.webPort),
     ALLOWED_ORIGINS: config.origin,

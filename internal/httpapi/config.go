@@ -1,12 +1,15 @@
 package httpapi
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/thatmyassets/tma-dashboard/internal/model"
 )
 
 type Config struct {
@@ -14,6 +17,7 @@ type Config struct {
 	AdminUsername   string
 	AdminPassword   string
 	AdminAPIToken   string
+	PairingCodeKey  string
 	SecureCookies   bool
 	TrustProxy      bool
 	AllowedOrigins  map[string]bool
@@ -52,7 +56,7 @@ func ConfigFromEnv() (Config, error) {
 	}
 	cfg := Config{
 		ListenAddr: envDefault("LISTEN_ADDR", ":8080"), AdminUsername: strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_USERNAME"))),
-		AdminPassword: os.Getenv("ADMIN_PASSWORD"), AdminAPIToken: os.Getenv("ADMIN_API_TOKEN"), SecureCookies: secure,
+		AdminPassword: os.Getenv("ADMIN_PASSWORD"), AdminAPIToken: os.Getenv("ADMIN_API_TOKEN"), PairingCodeKey: os.Getenv("PAIRING_CODE_KEY"), SecureCookies: secure,
 		TrustProxy: trustProxy, AllowedOrigins: origins, AllowAllOrigins: allowAllOrigins, SessionTTL: 8 * time.Hour,
 	}
 	if cfg.AdminUsername == "" || len(cfg.AdminPassword) < 12 {
@@ -63,6 +67,13 @@ func ConfigFromEnv() (Config, error) {
 	}
 	if cfg.AdminAPIToken != "" && len(cfg.AdminAPIToken) < 32 {
 		return Config{}, errors.New("ADMIN_API_TOKEN must contain at least 32 characters")
+	}
+	if cfg.PairingCodeKey == "" {
+		cfg.PairingCodeKey = base64.RawURLEncoding.EncodeToString(model.TokenHash(envDefault("DATABASE_URL", cfg.AdminPassword)))
+	}
+	key, keyErr := base64.RawURLEncoding.DecodeString(cfg.PairingCodeKey)
+	if keyErr != nil || len(key) != 32 {
+		return Config{}, errors.New("PAIRING_CODE_KEY must be a 32-byte base64url secret")
 	}
 	return cfg, nil
 }

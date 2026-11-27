@@ -49,10 +49,14 @@ func (m *memoryStore) DeleteSession(_ context.Context, hash []byte) error {
 	delete(m.sessions, string(hash))
 	return nil
 }
-func (m *memoryStore) CreatePairingCode(_ context.Context, hash []byte, expires time.Time) error {
+func (m *memoryStore) CreatePairingCode(_ context.Context, hash, _ []byte, expires time.Time) error {
 	m.codes[string(hash)] = expires
 	return nil
 }
+func (m *memoryStore) ListActivePairingCodes(context.Context) ([]model.PairingCode, error) {
+	return nil, nil
+}
+func (m *memoryStore) RevokePairingCode(context.Context, string) error { return store.ErrNotFound }
 func (m *memoryStore) Enroll(_ context.Context, codeHash, tokenHash []byte, hostname, os, version string, policyVersion *string) (string, error) {
 	if m.enrollErr != nil {
 		return "", m.enrollErr
@@ -138,6 +142,7 @@ func (m *memoryStore) CreatePolicy(_ context.Context, policy model.Policy) error
 	return nil
 }
 func (m *memoryStore) ListPolicies(context.Context) ([]model.Policy, error) { return m.policies, nil }
+func (m *memoryStore) DeletePolicy(context.Context, string) error           { return store.ErrNotFound }
 func (m *memoryStore) InsertEvent(_ context.Context, _ string, event model.Event) error {
 	for _, existing := range m.events {
 		if existing.EventID == event.EventID {

@@ -36,3 +36,25 @@ func (s *Server) createPolicy(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, policy)
 }
+
+func (s *Server) deletePolicy(w http.ResponseWriter, r *http.Request) {
+	version := r.PathValue("version")
+	if !model.UUID(version) {
+		writeError(w, 400, "invalid_policy_version", "Policy version must be a UUID")
+		return
+	}
+	err := s.store.DeletePolicy(r.Context(), version)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, 404, "policy_not_found", "Policy version was not found")
+		return
+	}
+	if errors.Is(err, store.ErrConflict) {
+		writeError(w, 409, "policy_in_use", "The last policy, a device-assigned policy, or a policy referenced by activity cannot be deleted")
+		return
+	}
+	if err != nil {
+		writeError(w, 500, "internal_error", "Could not delete policy")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"version": version, "deleted": true})
+}

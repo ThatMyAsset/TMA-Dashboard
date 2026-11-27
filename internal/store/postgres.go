@@ -152,9 +152,36 @@ func (s *Store) CleanupSessions(ctx context.Context) error {
 	return err
 }
 
-func (s *Store) CreatePairingCode(ctx context.Context, hash []byte, expiresAt time.Time) error {
-	_, err := s.DB.Exec(ctx, "INSERT INTO pairing_codes(id,code_hash,expires_at) VALUES($1,$2,$3)", model.NewUUID(), hash, expiresAt)
+func (s *Store) CreatePairingCode(ctx context.Context, hash, ciphertext []byte, expiresAt time.Time) error {
+	_, err := s.DB.Exec(ctx, "INSERT INTO pairing_codes(id,code_hash,code_ciphertext,expires_at) VALUES($1,$2,$3,$4)", model.NewUUID(), hash, ciphertext, expiresAt)
 	return err
+}
+
+func (s *Store) ListActivePairingCodes(ctx context.Context) ([]model.PairingCode, error) {
+	rows, err := s.DB.Query(ctx, `SELECT id,code_ciphertext,created_at,expires_at FROM pairing_codes WHERE used_at IS NULL AND expires_at>now() AND code_ciphertext IS NOT NULL ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	codes := []model.PairingCode{}
+	for rows.Next() {
+		var code model.PairingCode
+		if err := rows.Scan(&code.ID, &code.Ciphertext, &code.CreatedAt, &code.ExpiresAt); err != nil {
+			return nil, err
+		}
+		codes = append(codes, code)
+	}
+	return codes, rows.Err()
+}
+func (s *Store) RevokePairingCode(ctx context.Context, id string) error {
+	result, err := s.DB.Exec(ctx, `UPDATE pairing_codes SET used_at=now(),code_ciphertext=NULL WHERE id=$1 AND used_at IS NULL AND expires_at>now()`, id)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) Enroll(ctx context.Context, codeHash, tokenHash []byte, hostname, os, version string, policyVersion *string) (string, error) {
@@ -164,7 +191,7 @@ func (s *Store) Enroll(ctx context.Context, codeHash, tokenHash []byte, hostname
 	}
 	defer tx.Rollback(ctx)
 	var codeID string
-	err = tx.QueryRow(ctx, "UPDATE pairing_codes SET used_at=now() WHERE code_hash=$1 AND used_at IS NULL AND expires_at>now() RETURNING id", codeHash).Scan(&codeID)
+	err = tx.QueryRow(ctx, "UPDATE pairing_codes SET used_at=now(),code_ciphertext=NULL WHERE code_hash=$1 AND used_at IS NULL AND expires_at>now() RETURNING id", codeHash).Scan(&codeID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrInvalidCredentials
 	}
@@ -309,6 +336,40 @@ func (s *Store) ListPolicies(ctx context.Context) ([]model.Policy, error) {
 		policies = append(policies, p)
 	}
 	return policies, rows.Err()
+}
+
+func (s *Store) DeletePolicy(ctx context.Context, version string) error {
+	tx, err := s.DB.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var count int
+	if err = tx.QueryRow(ctx, `SELECT count(*) FROM policies`).Scan(&count); err != nil {
+		return err
+	}
+	if count <= 1 {
+		return ErrConflict
+	}
+	var referenced bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM devices WHERE policy_version=$1) OR EXISTS(SELECT 1 FROM events WHERE event->>'policy_version'=$1)`, version).Scan(&referenced); err != nil {
+		return err
+	}
+	if referenced {
+		return ErrConflict
+	}
+	result, err := tx.Exec(ctx, `DELETE FROM policies WHERE id=$1`, version)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return ErrConflict
+		}
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) InsertEvent(ctx context.Context, deviceID string, event model.Event) error {

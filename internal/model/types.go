@@ -359,6 +359,14 @@ type Device struct {
 	PolicyVersion         *string    `json:"policy_version"`
 }
 
+type PairingCode struct {
+	ID         string    `json:"id"`
+	Ciphertext []byte    `json:"-"`
+	Code       string    `json:"code"`
+	CreatedAt  time.Time `json:"created_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
+}
+
 type EventFilters struct {
 	Provider, Severity, Outcome, DeviceID string
 	Limit                                 int

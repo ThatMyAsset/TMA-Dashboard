@@ -1,7 +1,12 @@
 package httpapi
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +15,72 @@ import (
 	"github.com/thatmyassets/tma-dashboard/internal/model"
 	"github.com/thatmyassets/tma-dashboard/internal/store"
 )
+
+func (s *Server) pairingCipher() (cipher.AEAD, error) {
+	key, err := base64.RawURLEncoding.DecodeString(s.cfg.PairingCodeKey)
+	if err != nil || len(key) != 32 {
+		return nil, errors.New("PAIRING_CODE_KEY must be a 32-byte base64url secret")
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	return cipher.NewGCM(block)
+}
+func (s *Server) sealPairingCode(code string) ([]byte, error) {
+	aead, err := s.pairingCipher()
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, aead.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	return append(nonce, aead.Seal(nil, nonce, []byte(code), nil)...), nil
+}
+func (s *Server) openPairingCode(value []byte) (string, error) {
+	aead, err := s.pairingCipher()
+	if err != nil {
+		return "", err
+	}
+	if len(value) < aead.NonceSize() {
+		return "", errors.New("invalid pairing ciphertext")
+	}
+	plain, err := aead.Open(nil, value[:aead.NonceSize()], value[aead.NonceSize():], nil)
+	return string(plain), err
+}
+
+func (s *Server) listPairingCodes(w http.ResponseWriter, r *http.Request) {
+	codes, err := s.store.ListActivePairingCodes(r.Context())
+	if err != nil {
+		writeError(w, 500, "internal_error", "Could not load active pairing codes")
+		return
+	}
+	for i := range codes {
+		codes[i].Code, err = s.openPairingCode(codes[i].Ciphertext)
+		if err != nil {
+			writeError(w, 500, "internal_error", "Could not decrypt active pairing codes; verify PAIRING_CODE_KEY is unchanged")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"pairing_codes": codes})
+}
+func (s *Server) revokePairingCode(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !model.UUID(id) {
+		writeError(w, 400, "invalid_pairing_code_id", "Pairing code ID must be a UUID")
+		return
+	}
+	if err := s.store.RevokePairingCode(r.Context(), id); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, 404, "pairing_code_not_found", "Active pairing code was not found")
+			return
+		}
+		writeError(w, 500, "internal_error", "Could not revoke pairing code")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"id": id, "revoked": true})
+}
 
 func (s *Server) createPairingCode(w http.ResponseWriter, r *http.Request) {
 	var input struct {
@@ -23,8 +94,13 @@ func (s *Server) createPairingCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	code := randomToken("tma_pair_")
+	ciphertext, err := s.sealPairingCode(code)
+	if err != nil {
+		writeError(w, 500, "internal_error", "Could not protect pairing code for display")
+		return
+	}
 	expires := utcNow().Add(time.Duration(input.TTLHours) * time.Hour)
-	if err := s.store.CreatePairingCode(r.Context(), model.TokenHash(code), expires); err != nil {
+	if err := s.store.CreatePairingCode(r.Context(), model.TokenHash(code), ciphertext, expires); err != nil {
 		writeError(w, 500, "internal_error", "Could not create pairing code")
 		return
 	}

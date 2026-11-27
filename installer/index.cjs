@@ -356,7 +356,7 @@ async function preserveDockerSecrets(options) {
   const file = path.resolve(options.installDir || "tma-dashboard", ".env");
   if (!fs.existsSync(file)) return;
   const previous = parseEnv(await fs.promises.readFile(file, "utf8"));
-  const keys = { POSTGRES_DB: "dbName", POSTGRES_USER: "dbUser", POSTGRES_PASSWORD: "dbPassword", ADMIN_USERNAME: "adminUsername", ADMIN_PASSWORD: "adminPassword", ADMIN_API_TOKEN: "adminApiToken", ALLOWED_ORIGINS: "origin", WEB_PORT: "webPort", CONTROL_PLANE_PORT: "controlPlanePort" };
+  const keys = { POSTGRES_DB: "dbName", POSTGRES_USER: "dbUser", POSTGRES_PASSWORD: "dbPassword", ADMIN_USERNAME: "adminUsername", ADMIN_PASSWORD: "adminPassword", ADMIN_API_TOKEN: "adminApiToken", PAIRING_CODE_KEY: "pairingCodeKey", ALLOWED_ORIGINS: "origin", WEB_PORT: "webPort", CONTROL_PLANE_PORT: "controlPlanePort" };
   for (const [key, option] of Object.entries(keys)) if (previous[key] !== undefined && options[option] === undefined) options[option] = previous[key];
 }
 
