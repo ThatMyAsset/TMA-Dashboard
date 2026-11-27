@@ -376,4 +376,4 @@ async function main(argv = process.argv.slice(2)) {
   return stop(options);
 }
 
-module.exports = { main, install, plan, copySource, atomicWrite, systemdUnits, databaseUrl, composeArgs, assertPortsFree, preserveDockerSecrets };
+module.exports = { main, install, plan, copySource, atomicWrite, systemdUnits, databaseUrl, composeArgs, composeEnvironment, assertPortsFree, preserveDockerSecrets };
