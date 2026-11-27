@@ -81,8 +81,16 @@ func (s *Server) agentPolicies(w http.ResponseWriter, r *http.Request, device mo
 		writeError(w, http.StatusForbidden, "device_revoked", "Device has been revoked")
 		return
 	}
-	policy, err := s.store.LatestPolicy(r.Context())
+	if device.PolicyVersion == nil {
+		writeError(w, http.StatusConflict, "policy_unassigned", "No policy is assigned to this device")
+		return
+	}
+	policy, err := s.store.PolicyByVersion(r.Context(), *device.PolicyVersion)
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusConflict, "policy_unavailable", "The assigned policy is unavailable")
+			return
+		}
 		writeError(w, 500, "internal_error", "Could not load policy")
 		return
 	}
@@ -116,16 +124,11 @@ func (s *Server) heartbeat(w http.ResponseWriter, r *http.Request, device model.
 		writeError(w, http.StatusBadRequest, "invalid_status", "An enrolled device cannot return to pending_enrollment")
 		return
 	}
-	policy, err := s.store.LatestPolicy(r.Context())
-	if err != nil {
-		writeError(w, 500, "internal_error", "Could not load policy")
-		return
-	}
-	if err := s.store.Heartbeat(r.Context(), device.ID, input.AgentVersion, input.Status, input.InspectionEngineReady, input.BrowserConnected, policy.Version); err != nil {
+	if err := s.store.Heartbeat(r.Context(), device.ID, input.AgentVersion, input.Status, input.InspectionEngineReady, input.BrowserConnected, ""); err != nil {
 		writeError(w, 500, "internal_error", "Could not record heartbeat")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"policy_version": policy.Version, "server_time": utcNow()})
+	writeJSON(w, http.StatusOK, map[string]any{"policy_version": device.PolicyVersion, "server_time": utcNow()})
 }
 
 func validAgentStatus(status string) bool {
@@ -157,6 +160,33 @@ func (s *Server) revokeDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "revoked": true})
+}
+
+func (s *Server) assignDevicePolicy(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !model.UUID(id) {
+		writeError(w, http.StatusBadRequest, "invalid_device_id", "Device ID must be a UUID")
+		return
+	}
+	var input struct {
+		PolicyVersion string `json:"policy_version"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if !model.UUID(input.PolicyVersion) {
+		writeError(w, http.StatusBadRequest, "invalid_policy_version", "Policy version must be a UUID")
+		return
+	}
+	if err := s.store.AssignDevicePolicy(r.Context(), id, input.PolicyVersion); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "assignment_target_not_found", "Active device or policy was not found")
+			return
+		}
+		writeError(w, 500, "internal_error", "Could not assign policy")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"device_id": id, "policy_version": input.PolicyVersion})
 }
 
 func parseLimit(value string) (int, bool) {

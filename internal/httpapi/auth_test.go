@@ -49,6 +49,25 @@ func TestLoginSetsSessionCookie(t *testing.T) {
 	}
 }
 
+func TestDevelopmentWildcardOrigin(t *testing.T) {
+	memory := newMemoryStore()
+	hash, _ := bcrypt.GenerateFromPassword([]byte("correct horse battery"), bcrypt.MinCost)
+	memory.passwordHash = string(hash)
+	cfg := testConfig()
+	cfg.AllowAllOrigins = true
+	server, err := NewServer(memory, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := loginRequest("correct horse battery")
+	request.Header.Set("Origin", "http://43.157.201.52:3000")
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("development origin got %d: %s", response.Code, response.Body.String())
+	}
+}
+
 func TestAdminOriginAndDeviceTokenSeparation(t *testing.T) {
 	memory := newMemoryStore()
 	server, _ := NewServer(memory, testConfig())

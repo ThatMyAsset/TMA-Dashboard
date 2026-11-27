@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 
-const apiBase = () => process.env.CONTROL_PLANE_URL ?? "http://127.0.0.1:8080";
+const apiBase = () => {
+  const value = process.env.CONTROL_PLANE_URL;
+  if (!value) throw new Error("CONTROL_PLANE_URL is required");
+  return value;
+};
 
 export async function apiServer<T>(path: string): Promise<T> {
   const cookieStore = await cookies();

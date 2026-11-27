@@ -41,6 +41,7 @@ type PolicyRule struct {
 	Categories  []string `json:"categories"`
 	MinSeverity string   `json:"min_severity"`
 	Providers   []string `json:"providers"`
+	Tags        []string `json:"tags"`
 }
 
 func UTCTime(s string) (time.Time, error) {
@@ -80,20 +81,24 @@ func (p *Policy) UnmarshalJSON(data []byte) error {
 }
 
 type Policy struct {
-	Version     string       `json:"version"`
-	GeneratedAt time.Time    `json:"generated_at"`
-	FailureMode string       `json:"failure_mode"`
-	Rules       []PolicyRule `json:"rules"`
+	Version          string       `json:"version"`
+	GeneratedAt      time.Time    `json:"generated_at"`
+	FailureMode      string       `json:"failure_mode"`
+	AllowedFileTypes []string     `json:"allowed_file_types"`
+	Tags             []string     `json:"tags"`
+	Rules            []PolicyRule `json:"rules"`
 }
 
 func DefaultPolicy() Policy {
 	now := time.Now().UTC().Truncate(time.Second)
 	return Policy{
 		Version: NewUUID(), GeneratedAt: now, FailureMode: "block",
+		AllowedFileTypes: []string{"txt", "csv", "json", "xml", "yaml", "yml", "log", "env", "sql", "py", "js", "ts", "go", "rs"},
+		Tags:             []string{"credential", "private_key", "pii", "financial", "identity:id:nik", "environment:env"},
 		Rules: []PolicyRule{
-			{ID: NewUUID(), Name: "Block credentials", Enabled: true, Priority: 10, Action: "block", Categories: []string{"credential", "private_key"}, MinSeverity: "high", Providers: []string{}},
-			{ID: NewUUID(), Name: "Audit personal and financial data", Enabled: true, Priority: 20, Action: "audit", Categories: []string{"pii", "financial"}, MinSeverity: "medium", Providers: []string{}},
-			{ID: NewUUID(), Name: "Allow complete inspection", Enabled: true, Priority: 1000, Action: "allow", Categories: []string{}, MinSeverity: "low", Providers: []string{}},
+			{ID: NewUUID(), Name: "Block credentials", Enabled: true, Priority: 10, Action: "block", Categories: []string{"credential", "private_key"}, MinSeverity: "high", Providers: []string{}, Tags: []string{}},
+			{ID: NewUUID(), Name: "Audit personal and financial data", Enabled: true, Priority: 20, Action: "audit", Categories: []string{"pii", "financial"}, MinSeverity: "medium", Providers: []string{}, Tags: []string{}},
+			{ID: NewUUID(), Name: "Allow complete inspection", Enabled: true, Priority: 1000, Action: "allow", Categories: []string{}, MinSeverity: "low", Providers: []string{}, Tags: []string{}},
 		},
 	}
 }
@@ -127,6 +132,24 @@ func (p Policy) Validate() error {
 	if len(p.Rules) == 0 || len(p.Rules) > 100 {
 		return errors.New("rules must contain between 1 and 100 items")
 	}
+	if len(p.AllowedFileTypes) == 0 || len(p.AllowedFileTypes) > 100 || len(p.Tags) > 100 {
+		return errors.New("allowed_file_types must contain 1 to 100 items and tags at most 100 items")
+	}
+	supportedTypes := set("txt", "csv", "json", "xml", "yaml", "yml", "log", "env", "sql", "py", "js", "ts", "go", "rs")
+	for _, extension := range p.AllowedFileTypes {
+		if !supportedTypes[extension] {
+			return errors.New("allowed_file_types must contain supported lowercase file extensions without dots")
+		}
+	}
+	for _, tag := range p.Tags {
+		if len(tag) == 0 || len(tag) > 64 || !regexp.MustCompile(`^[a-z][a-z0-9:_-]*$`).MatchString(tag) {
+			return errors.New("tags must contain valid lowercase data labels")
+		}
+	}
+	configuredTags := make(map[string]bool, len(p.Tags))
+	for _, tag := range p.Tags {
+		configuredTags[tag] = true
+	}
 	ids := map[string]bool{}
 	priorities := map[int]bool{}
 	for i, rule := range p.Rules {
@@ -153,6 +176,9 @@ func (p Policy) Validate() error {
 		if len(rule.Categories) > 30 || len(rule.Providers) > 30 {
 			return fmt.Errorf("rules[%d] has too many categories or providers", i)
 		}
+		if len(rule.Tags) > 50 {
+			return fmt.Errorf("rules[%d] has too many tags", i)
+		}
 		if rule.Categories == nil || rule.Providers == nil {
 			return fmt.Errorf("rules[%d].categories and providers must be arrays", i)
 		}
@@ -164,6 +190,14 @@ func (p Policy) Validate() error {
 		for _, provider := range rule.Providers {
 			if !categoryPattern.MatchString(provider) {
 				return fmt.Errorf("rules[%d] contains an invalid provider", i)
+			}
+		}
+		for _, tag := range rule.Tags {
+			if len(tag) == 0 || len(tag) > 64 || !regexp.MustCompile(`^[a-z][a-z0-9:_-]*$`).MatchString(tag) {
+				return fmt.Errorf("rules[%d] contains an invalid tag", i)
+			}
+			if !configuredTags[tag] {
+				return fmt.Errorf("rules[%d] references a tag that is not enabled by the policy", i)
 			}
 		}
 	}

@@ -196,11 +196,11 @@ func scanDevice(row scanner) (model.Device, error) {
 	return d, err
 }
 
-func (s *Store) Heartbeat(ctx context.Context, deviceID, agentVersion, status string, engineReady, browserConnected bool, policyVersion string) error {
+func (s *Store) Heartbeat(ctx context.Context, deviceID, agentVersion, status string, engineReady, browserConnected bool, _ string) error {
 	if status == "protected" && (!engineReady || !browserConnected) {
 		status = "limited"
 	}
-	result, err := s.DB.Exec(ctx, `UPDATE devices SET agent_version=$2,status=$3,inspection_engine_ready=$4,browser_connected=$5,last_seen_at=now(),policy_version=$6 WHERE id=$1 AND revoked_at IS NULL`, deviceID, agentVersion, status, engineReady, browserConnected, policyVersion)
+	result, err := s.DB.Exec(ctx, `UPDATE devices SET agent_version=$2,status=$3,inspection_engine_ready=$4,browser_connected=$5,last_seen_at=now() WHERE id=$1 AND revoked_at IS NULL`, deviceID, agentVersion, status, engineReady, browserConnected)
 	if err != nil {
 		return err
 	}
@@ -250,6 +250,32 @@ func (s *Store) LatestPolicy(ctx context.Context) (model.Policy, error) {
 	}
 	err = json.Unmarshal(document, &p)
 	return p, err
+}
+
+func (s *Store) PolicyByVersion(ctx context.Context, version string) (model.Policy, error) {
+	var p model.Policy
+	var document []byte
+	err := s.DB.QueryRow(ctx, "SELECT document FROM policies WHERE id=$1", version).Scan(&document)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return p, ErrNotFound
+	}
+	if err != nil {
+		return p, err
+	}
+	err = json.Unmarshal(document, &p)
+	return p, err
+}
+
+func (s *Store) AssignDevicePolicy(ctx context.Context, deviceID, policyVersion string) error {
+	result, err := s.DB.Exec(ctx, `UPDATE devices SET policy_version=$2
+		WHERE id=$1 AND revoked_at IS NULL AND EXISTS (SELECT 1 FROM policies WHERE id=$2)`, deviceID, policyVersion)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) CreatePolicy(ctx context.Context, policy model.Policy) error {

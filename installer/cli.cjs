@@ -20,9 +20,9 @@ Commands:
 Options:
   --mode docker|system          Deployment mode (default: docker)
   --install-dir PATH            Installation directory (default: ./tma-dashboard)
-  --origin URL                  Browser HTTP(S) origin, without a path
+  --origin URL                  Browser origin(s), comma-separated, or * for Docker lab
   --web-port PORT               Dashboard HTTP port (default: 3000)
-  --control-plane-port PORT     System Control Plane port (default: 8080)
+  --control-plane-port PORT     Control Plane port (default: 18080 Docker, 8080 system)
   --admin-name NAME             Initial administrator name (default: admin)
   --admin-password VALUE        Initial administrator password (12–72 bytes)
   --admin-password-confirm VALUE  Password confirmation for noninteractive installs
@@ -137,7 +137,7 @@ async function collect(options) {
       config.installDir = await ask("Installation directory", config.installDir);
       config.webPort = Number(await ask("Dashboard HTTP port", config.webPort));
       if (config.mode === "docker") {
-        config.origin = await ask("Browser origin (use --origin for noninteractive installs)", config.origin);
+        config.origin = await ask("Browser origin (replace VPS_IP, or use * for any lab origin)", options.origin || `http://VPS_IP:${config.webPort}`);
       } else {
         config.controlPlanePort = Number(await ask("Control Plane port", config.controlPlanePort));
         config.origin = await ask("Browser origin", `http://localhost:${config.webPort}`);

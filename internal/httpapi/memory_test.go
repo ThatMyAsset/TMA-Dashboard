@@ -94,11 +94,39 @@ func (m *memoryStore) RevokeDevice(_ context.Context, id string) error {
 	}
 	return store.ErrNotFound
 }
+func (m *memoryStore) AssignDevicePolicy(_ context.Context, id, version string) error {
+	var policyExists bool
+	for _, policy := range m.policies {
+		if policy.Version == version {
+			policyExists = true
+			break
+		}
+	}
+	if !policyExists {
+		return store.ErrNotFound
+	}
+	for hash, device := range m.devices {
+		if device.ID == id && device.RevokedAt == nil {
+			device.PolicyVersion = &version
+			m.devices[hash] = device
+			return nil
+		}
+	}
+	return store.ErrNotFound
+}
 func (m *memoryStore) LatestPolicy(context.Context) (model.Policy, error) {
 	if len(m.policies) == 0 {
 		return model.Policy{}, store.ErrNotFound
 	}
 	return m.policies[len(m.policies)-1], nil
+}
+func (m *memoryStore) PolicyByVersion(_ context.Context, version string) (model.Policy, error) {
+	for _, policy := range m.policies {
+		if policy.Version == version {
+			return policy, nil
+		}
+	}
+	return model.Policy{}, store.ErrNotFound
 }
 func (m *memoryStore) CreatePolicy(_ context.Context, policy model.Policy) error {
 	for _, existing := range m.policies {

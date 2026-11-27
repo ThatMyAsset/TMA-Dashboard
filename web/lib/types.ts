@@ -11,12 +11,15 @@ export type PolicyRule = {
   categories: string[];
   min_severity: Severity;
   providers: string[];
+  tags: string[];
 };
 
 export type Policy = {
   version: string;
   generated_at: string;
   failure_mode: "block" | "audit";
+  allowed_file_types: string[];
+  tags: string[];
   rules: PolicyRule[];
 };
 

@@ -23,7 +23,9 @@ type Store interface {
 	Heartbeat(context.Context, string, string, string, bool, bool, string) error
 	ListDevices(context.Context) ([]model.Device, error)
 	RevokeDevice(context.Context, string) error
+	AssignDevicePolicy(context.Context, string, string) error
 	LatestPolicy(context.Context) (model.Policy, error)
+	PolicyByVersion(context.Context, string) (model.Policy, error)
 	CreatePolicy(context.Context, model.Policy) error
 	ListPolicies(context.Context) ([]model.Policy, error)
 	InsertEvent(context.Context, string, model.Event) error
@@ -72,6 +74,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/events", s.rateLimit(s.ingestLimiter, s.requireDevice(s.ingestEvent)))
 	mux.HandleFunc("GET /api/v1/devices", s.requireAdmin(s.listDevices))
 	mux.HandleFunc("POST /api/v1/devices/{id}/revoke", s.requireAdmin(s.revokeDevice))
+	mux.HandleFunc("PUT /api/v1/devices/{id}/policy", s.requireAdmin(s.assignDevicePolicy))
 	mux.HandleFunc("GET /api/v1/events", s.requireAdmin(s.listEvents))
 	mux.HandleFunc("GET /api/v1/overview", s.requireAdmin(s.overview))
 	mux.HandleFunc("GET /api/v1/policies", s.requireAdmin(s.listPolicies))
