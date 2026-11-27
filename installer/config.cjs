@@ -1,6 +1,7 @@
 "use strict";
 
 const { randomBytes } = require("node:crypto");
+const net = require("node:net");
 const path = require("node:path");
 
 const SECRET_KEYS = new Set(["ADMIN_PASSWORD", "POSTGRES_PASSWORD", "ADMIN_API_TOKEN", "DATABASE_URL", "DB_ADMIN_URL"]);
@@ -17,8 +18,8 @@ function parseOrigin(value) {
   if (!["http:", "https:"].includes(origin.protocol) || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/") {
     throw new Error("origin must contain only an HTTP(S) scheme, host, and optional port");
   }
-  if (origin.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)) {
-    throw new Error("HTTP origins are allowed only for localhost; use HTTPS for a named host");
+  if (origin.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname) && !net.isIP(origin.hostname.replace(/^\[|\]$/g, ""))) {
+    throw new Error("HTTP origins require localhost or an IP address; use HTTPS for a named host");
   }
   return origin.origin;
 }
@@ -45,7 +46,7 @@ function validateConfig(config) {
   if (new Set([config.webPort, config.controlPlanePort]).size !== 2) throw new Error("web and Control Plane ports must differ");
   if (config.mode === "system" && config.secureCookies) throw new Error("system mode serves local HTTP only");
   if ((config.mode === "system" || !config.secureCookies) && Number(parsed.port || (parsed.protocol === "http:" ? 80 : 443)) !== config.webPort) throw new Error("origin port must match the Dashboard port");
-  if (config.mode === "docker" && !config.secureCookies) console.warn("WARNING: local HTTP mode sends credentials without TLS. Keep Dashboard bound to loopback or place a trusted HTTPS reverse proxy in front before remote use.");
+  if (config.mode === "docker" && !config.secureCookies) console.warn("WARNING: HTTP lab mode has no TLS. Dashboard and Control Plane bind to 0.0.0.0. Restrict VPS firewall/security group to your IP; do not use for production data.");
   if (!/^[a-z][a-z0-9_]{0,62}$/.test(config.adminUsername)) throw new Error("admin username must start with a lowercase letter and contain only lowercase letters, numbers, and underscores");
   validateSecret(config.adminPassword, "admin password");
   validateSecret(config.dbPassword, "database password", 16, 128);
@@ -99,8 +100,8 @@ function renderEnv(config) {
     ADMIN_USERNAME: config.adminUsername,
     ADMIN_PASSWORD: config.adminPassword,
     ADMIN_API_TOKEN: config.adminApiToken,
-    DASHBOARD_HOST: "127.0.0.1",
-    CONTROL_PLANE_HOST: "127.0.0.1",
+    DASHBOARD_HOST: config.mode === "docker" ? "0.0.0.0" : "127.0.0.1",
+    CONTROL_PLANE_HOST: config.mode === "docker" ? "0.0.0.0" : "127.0.0.1",
     CONTROL_PLANE_PORT: String(config.controlPlanePort),
     WEB_PORT: String(config.webPort),
     ALLOWED_ORIGINS: config.origin,

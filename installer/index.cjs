@@ -304,8 +304,10 @@ async function install(options) {
   if (config.adminUsername) console.log(`Administrator: ${config.adminUsername}`);
   console.log("Retrieve generated bootstrap values from .env and store them securely. Existing admin passwords are not replaced on restart.");
   if (config.mode === "docker") {
-    console.log(`Agent Control Plane URL after opening the SSH reverse tunnel: http://localhost:${config.controlPlanePort}`);
-    console.log(`On Windows Agent: ssh -N -R ${config.controlPlanePort}:127.0.0.1:${config.controlPlanePort} ubuntu@VPS_IP`);
+    const agentOrigin = new URL(config.origin);
+    agentOrigin.port = String(config.controlPlanePort);
+    console.log(`Agent Control Plane URL: ${agentOrigin.origin}`);
+    console.log("Open firewall/security-group access to this port only from your lab IP.");
     console.log("The browser extension requires its local Native Messaging setup separately.");
   }
 }

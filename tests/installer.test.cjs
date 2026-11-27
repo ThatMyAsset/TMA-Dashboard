@@ -20,8 +20,8 @@ test("noninteractive arguments and environment create a valid configuration", as
   assert.equal(config.origin, "http://localhost:3100");
   const dockerEnv = parseEnv(renderEnv(config));
   assert.equal(dockerEnv.WEB_PORT, "3100");
-  assert.equal(dockerEnv.DASHBOARD_HOST, "127.0.0.1");
-  assert.equal(dockerEnv.CONTROL_PLANE_HOST, "127.0.0.1");
+  assert.equal(dockerEnv.DASHBOARD_HOST, "0.0.0.0");
+  assert.equal(dockerEnv.CONTROL_PLANE_HOST, "0.0.0.0");
   assert.equal(dockerEnv.CONTROL_PLANE_PORT, "18080");
   assert.equal(dockerEnv.ALLOWED_ORIGINS, "http://localhost:3100");
   assert.equal(dockerEnv.COOKIE_SECURE, "false");
@@ -46,6 +46,8 @@ test("origins, ports, identifiers, and Docker database passwords are validated",
   assert.throws(() => validateConfig(defaults({ ...passwords, mode: "system", origin: "https://localhost:3000" })), /local HTTP/);
   assert.throws(() => validateConfig(defaults({ ...passwords, origin: "http://localhost:8443" })), /origin port/);
   assert.equal(validateConfig(defaults({ ...passwords, mode: "docker", origin: "https://dashboard.example.com" })).secureCookies, true);
+  assert.equal(parseOrigin("http://203.0.113.10:3000"), "http://203.0.113.10:3000");
+  assert.throws(() => parseOrigin("http://dashboard.example.com"), /IP address/);
 });
 
 test("environment rendering round-trips and URL-encodes system credentials", () => {
