@@ -112,6 +112,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .onboarding-number { font-family: 'Manrope', sans-serif; font-size: 28px; color: var(--accent); }
 .onboarding p { color: #436460; margin-top: 4px; max-width: 720px; font-size: 14px; }
 .table-wrap { width: 100%; overflow-x: auto; }
+.table-wrap table { min-width: 860px; }
+.table-wrap--devices table { min-width: 1080px; }
+.table-wrap--activity table { min-width: 1180px; }
 table { width: 100%; border-collapse: collapse; text-align: left; }
 th { padding: 11px 18px; background: var(--surface-subtle); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
 td { padding: 14px 18px; border-bottom: 1px solid #e8edef; font-size: 14px; vertical-align: middle; }
@@ -160,8 +163,9 @@ tbody tr:hover { background: #fafcfc; }
 .info-strip p { font-size: 13px; margin-top: 3px; max-width: 860px; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field label { color: var(--ink); font-size: 13px; font-weight: 500; }
-.field input, .field select { width: 100%; height: 42px; background: var(--surface); border: 1px solid var(--line-strong); color: var(--ink); border-radius: 6px; padding: 8px 11px; font-size: 14px; }
-.field input:hover, .field select:hover { border-color: #93a8b3; }
+.field input:not([type="checkbox"]), .field select { width: 100%; height: 42px; background: var(--surface); border: 1px solid var(--line-strong); color: var(--ink); border-radius: 6px; padding: 8px 11px; font-size: 14px; }
+.field input[type="checkbox"] { appearance: auto; width: 16px; height: 16px; margin: 0; padding: 0; accent-color: var(--accent); flex: 0 0 16px; }
+.field input:not([type="checkbox"]):hover, .field select:hover { border-color: #93a8b3; }
 .field input::placeholder { color: #7c8992; }
 .field-help { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .form-error { padding: 12px 14px; color: var(--red); background: var(--red-soft); border-radius: 6px; font-size: 14px; }
@@ -201,6 +205,9 @@ tbody tr:hover { background: #fafcfc; }
 .step-number { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; background: var(--accent-soft); color: var(--accent); border-radius: 50%; font-size: 12px; font-weight: 600; }
 .code-box { display: flex; align-items: center; gap: 14px; margin: 16px 0 22px; padding: 16px; border: 1px dashed #97b9b1; border-radius: 8px; background: var(--accent-soft); }
 .code-box code { flex: 1; min-width: 0; overflow-wrap: anywhere; color: #174e48; font-size: 15px; }
+.pairing-code-input { flex: 1; min-width: 0; width: 100%; min-height: 42px; padding: 9px 12px; border: 1px solid #b8d4cd; border-radius: 6px; background: #fff; color: #174e48; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; user-select: all; }
+.copy-notice { display: flex; align-items: center; gap: 7px; margin: -12px 0 18px 38px; color: var(--amber); font-size: 13px; }
+.copy-notice--success { color: var(--green); }
 .device-name { display: flex; align-items: center; gap: 10px; min-width: 160px; }
 .device-name strong, .device-name small { display: block; }
 .device-name strong { font-size: 14px; }
@@ -213,6 +220,8 @@ tbody tr:hover { background: #fafcfc; }
 .danger-button:hover:not(:disabled) { text-decoration: underline; }
 .row--muted { opacity: .65; }
 .policy-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; padding: 22px; border-bottom: 1px solid var(--line); }
+.policy-settings .readiness { gap: 8px 12px; align-content: start; }
+.policy-settings .readiness label { display: flex; align-items: center; gap: 8px; min-height: 22px; font-size: 13px; }
 .precedence-note { padding-left: 24px; border-left: 1px solid var(--line); }
 .precedence-note > span { display: block; font-size: 13px; color: var(--muted); }
 .precedence-note strong { display: block; margin: 4px 0; font-size: 15px; }
@@ -346,6 +355,7 @@ tbody tr:hover { background: #fafcfc; }
   .rule-editor-head, .rule-list, .policy-settings { padding-left: 16px; padding-right: 16px; }
   .rule-grid { grid-template-columns: 1fr; }
   .field--wide { grid-column: auto; }
+  .copy-notice { margin-left: 0; }
   .rule-title { flex-wrap: wrap; }
   .rule-number { order: 3; }
   .policy-row { grid-template-columns: 1fr; gap: 14px; }
