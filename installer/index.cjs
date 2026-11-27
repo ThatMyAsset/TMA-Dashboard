@@ -82,6 +82,7 @@ function composeEnvironment(config, inherited = process.env) {
   const envFile = path.join(config.installDir, ".env");
   const configured = parseEnv(fs.readFileSync(envFile, "utf8"));
   for (const key of Object.keys(configured)) delete env[key];
+  for (const key of ["DASHBOARD_HOST", "CONTROL_PLANE_HOST"]) delete env[key];
   for (const key of Object.keys(env)) {
     if (key.startsWith("COMPOSE_")) delete env[key];
   }
