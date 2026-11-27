@@ -175,6 +175,8 @@ test("Control Plane runtime settings come from the install env file, not shell i
   const compose = await fs.promises.readFile(path.join(__dirname, "..", "compose.yaml"), "utf8");
   assert.match(compose, /env_file:\s*\n\s+- \.env/);
   assert.match(compose, /env_file:\s*\n\s+- \.postgres\.env/);
+  const dockerignore = await fs.promises.readFile(path.join(__dirname, "..", ".dockerignore"), "utf8");
+  assert.match(dockerignore, /^\\.postgres\\.env$/m);
   for (const key of ["DATABASE_URL", "ADMIN_USERNAME", "ADMIN_PASSWORD", "ADMIN_API_TOKEN", "ALLOWED_ORIGINS", "DEV_ALLOW_ALL_ORIGINS", "COOKIE_SECURE", "TRUST_PROXY", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"]) {
     assert.equal(compose.includes(key + ": ${"), false, `${key} must come from env_file`);
   }
