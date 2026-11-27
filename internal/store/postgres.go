@@ -238,7 +238,7 @@ func (s *Store) Heartbeat(ctx context.Context, deviceID, agentVersion, status st
 }
 
 func (s *Store) ListDevices(ctx context.Context) ([]model.Device, error) {
-	rows, err := s.DB.Query(ctx, deviceSelect+" ORDER BY enrolled_at DESC")
+	rows, err := s.DB.Query(ctx, deviceSelect+" WHERE revoked_at IS NULL ORDER BY enrolled_at DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +255,7 @@ func (s *Store) ListDevices(ctx context.Context) ([]model.Device, error) {
 }
 
 func (s *Store) RevokeDevice(ctx context.Context, id string) error {
-	result, err := s.DB.Exec(ctx, "UPDATE devices SET revoked_at=now(),status='degraded' WHERE id=$1 AND revoked_at IS NULL", id)
+	result, err := s.DB.Exec(ctx, "UPDATE devices SET revoked_at=now(),status='degraded',policy_version=NULL WHERE id=$1 AND revoked_at IS NULL", id)
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func (s *Store) RevokeDevice(ctx context.Context, id string) error {
 func (s *Store) LatestPolicy(ctx context.Context) (model.Policy, error) {
 	var p model.Policy
 	var document []byte
-	err := s.DB.QueryRow(ctx, "SELECT document FROM policies ORDER BY sequence DESC LIMIT 1").Scan(&document)
+	err := s.DB.QueryRow(ctx, "SELECT document FROM policies ORDER BY generated_at DESC,sequence DESC LIMIT 1").Scan(&document)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, ErrNotFound
 	}
@@ -317,8 +317,23 @@ func (s *Store) CreatePolicy(ctx context.Context, policy model.Policy) error {
 	return err
 }
 
+func (s *Store) UpdatePolicy(ctx context.Context, policy model.Policy) error {
+	document, err := json.Marshal(policy)
+	if err != nil {
+		return err
+	}
+	result, err := s.DB.Exec(ctx, "UPDATE policies SET generated_at=$2,document=$3 WHERE id=$1", policy.Version, policy.GeneratedAt, document)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) ListPolicies(ctx context.Context) ([]model.Policy, error) {
-	rows, err := s.DB.Query(ctx, "SELECT document FROM policies ORDER BY sequence DESC LIMIT 100")
+	rows, err := s.DB.Query(ctx, "SELECT document FROM policies ORDER BY generated_at DESC,sequence DESC LIMIT 100")
 	if err != nil {
 		return nil, err
 	}
@@ -344,22 +359,35 @@ func (s *Store) DeletePolicy(ctx context.Context, version string) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	var count int
-	if err = tx.QueryRow(ctx, `SELECT count(*) FROM policies`).Scan(&count); err != nil {
+	var exists bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM policies WHERE id=$1)`, version).Scan(&exists); err != nil {
 		return err
 	}
-	if count <= 1 {
-		return ErrConflict
+	if !exists {
+		return ErrNotFound
 	}
-	var referenced bool
-	// policy_version is UUID in devices but JSON text in event.event. Keep the
-	// parameter types explicit so PostgreSQL does not infer UUID for both sides
-	// and fail with "operator does not exist: text = uuid" (500 on delete).
-	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM devices WHERE policy_version=$1::uuid) OR EXISTS(SELECT 1 FROM events WHERE event->>'policy_version'=$2::text)`, version, version).Scan(&referenced); err != nil {
+	// Active endpoints move to another named policy. When removing the final
+	// policy, seed a fresh safe baseline so new enrollments still have one.
+	var fallbackDocument []byte
+	err = tx.QueryRow(ctx, `SELECT document FROM policies WHERE id<>$1 ORDER BY generated_at DESC,sequence DESC LIMIT 1`, version).Scan(&fallbackDocument)
+	if errors.Is(err, pgx.ErrNoRows) {
+		fallback := model.DefaultPolicy()
+		fallbackDocument, err = json.Marshal(fallback)
+		if err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO policies(id,generated_at,document) VALUES($1,$2,$3)`, fallback.Version, fallback.GeneratedAt, fallbackDocument); err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
 	}
-	if referenced {
-		return ErrConflict
+	var fallback model.Policy
+	if err = json.Unmarshal(fallbackDocument, &fallback); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE devices SET policy_version=CASE WHEN revoked_at IS NULL THEN $2::uuid ELSE NULL END WHERE policy_version=$1::uuid`, version, fallback.Version); err != nil {
+		return err
 	}
 	result, err := tx.Exec(ctx, `DELETE FROM policies WHERE id=$1`, version)
 	if err != nil {

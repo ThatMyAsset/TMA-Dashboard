@@ -83,7 +83,9 @@ func (m *memoryStore) Heartbeat(_ context.Context, _, _, status string, _, _ boo
 func (m *memoryStore) ListDevices(context.Context) ([]model.Device, error) {
 	devices := []model.Device{}
 	for _, device := range m.devices {
-		devices = append(devices, device)
+		if device.RevokedAt == nil {
+			devices = append(devices, device)
+		}
 	}
 	return devices, nil
 }
@@ -92,6 +94,7 @@ func (m *memoryStore) RevokeDevice(_ context.Context, id string) error {
 		if device.ID == id {
 			now := time.Now()
 			device.RevokedAt = &now
+			device.PolicyVersion = nil
 			m.devices[hash] = device
 			return nil
 		}
@@ -140,6 +143,15 @@ func (m *memoryStore) CreatePolicy(_ context.Context, policy model.Policy) error
 	}
 	m.policies = append(m.policies, policy)
 	return nil
+}
+func (m *memoryStore) UpdatePolicy(_ context.Context, policy model.Policy) error {
+	for index := range m.policies {
+		if m.policies[index].Version == policy.Version {
+			m.policies[index] = policy
+			return nil
+		}
+	}
+	return store.ErrNotFound
 }
 func (m *memoryStore) ListPolicies(context.Context) ([]model.Policy, error) { return m.policies, nil }
 func (m *memoryStore) DeletePolicy(context.Context, string) error           { return store.ErrNotFound }

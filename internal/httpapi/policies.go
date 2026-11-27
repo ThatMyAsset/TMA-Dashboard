@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/thatmyassets/tma-dashboard/internal/model"
 	"github.com/thatmyassets/tma-dashboard/internal/store"
@@ -37,6 +38,35 @@ func (s *Server) createPolicy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, policy)
 }
 
+func (s *Server) updatePolicy(w http.ResponseWriter, r *http.Request) {
+	version := r.PathValue("version")
+	if !model.UUID(version) {
+		writeError(w, http.StatusBadRequest, "invalid_policy_id", "Policy ID must be a UUID")
+		return
+	}
+	var policy model.Policy
+	if !decodeJSON(w, r, &policy) {
+		return
+	}
+	if policy.Version != version {
+		writeError(w, http.StatusBadRequest, "policy_id_mismatch", "Policy ID cannot change while editing a policy")
+		return
+	}
+	policy.GeneratedAt = time.Now().UTC().Truncate(time.Second)
+	if err := policy.Validate(); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_policy", err.Error())
+		return
+	}
+	if err := s.store.UpdatePolicy(r.Context(), policy); errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "policy_not_found", "Policy was not found")
+		return
+	} else if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Could not update policy")
+		return
+	}
+	writeJSON(w, http.StatusOK, policy)
+}
+
 func (s *Server) deletePolicy(w http.ResponseWriter, r *http.Request) {
 	version := r.PathValue("version")
 	if !model.UUID(version) {
@@ -48,13 +78,9 @@ func (s *Server) deletePolicy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 404, "policy_not_found", "Policy version was not found")
 		return
 	}
-	if errors.Is(err, store.ErrConflict) {
-		writeError(w, 409, "policy_in_use", "The last policy, a device-assigned policy, or a policy referenced by activity cannot be deleted")
-		return
-	}
 	if err != nil {
 		writeError(w, 500, "internal_error", "Could not delete policy")
 		return
 	}
-	writeJSON(w, 200, map[string]any{"version": version, "deleted": true})
+	writeJSON(w, 200, map[string]any{"version": version, "deleted": true, "message": "Assigned active devices were moved to another policy. Historical activity is retained."})
 }

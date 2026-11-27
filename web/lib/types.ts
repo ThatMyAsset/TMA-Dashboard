@@ -15,6 +15,7 @@ export type PolicyRule = {
 };
 
 export type Policy = {
+  name: string;
   version: string;
   generated_at: string;
   failure_mode: "block" | "audit";
@@ -56,6 +57,7 @@ export type SecurityEvent = {
   findings: Finding[];
   risk_score: number;
   policy_version: string;
+  policy_name?: string;
 };
 
 export type Overview = {

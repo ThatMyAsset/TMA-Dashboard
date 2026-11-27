@@ -30,6 +30,7 @@ type Store interface {
 	LatestPolicy(context.Context) (model.Policy, error)
 	PolicyByVersion(context.Context, string) (model.Policy, error)
 	CreatePolicy(context.Context, model.Policy) error
+	UpdatePolicy(context.Context, model.Policy) error
 	ListPolicies(context.Context) ([]model.Policy, error)
 	DeletePolicy(context.Context, string) error
 	InsertEvent(context.Context, string, model.Event) error
@@ -88,6 +89,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/overview", s.requireAdmin(s.overview))
 	mux.HandleFunc("GET /api/v1/policies", s.requireAdmin(s.listPolicies))
 	mux.HandleFunc("POST /api/v1/policies", s.requireAdmin(s.createPolicy))
+	mux.HandleFunc("PUT /api/v1/policies/{version}", s.requireAdmin(s.updatePolicy))
 	mux.HandleFunc("DELETE /api/v1/policies/{version}", s.requireAdmin(s.deletePolicy))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "API endpoint not found")

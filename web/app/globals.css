@@ -220,7 +220,7 @@ tbody tr:hover { background: #fafcfc; }
 .danger-button:hover:not(:disabled) { text-decoration: underline; }
 .row--muted { opacity: .65; }
 .policy-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; padding: 22px; border-bottom: 1px solid var(--line); }
-.policy-settings .readiness { gap: 8px 12px; align-content: start; }
+.policy-settings .readiness { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px 12px; align-content: start; max-height: 240px; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); }
 .policy-settings .readiness label { display: flex; align-items: center; gap: 8px; min-height: 22px; font-size: 13px; }
 .precedence-note { padding-left: 24px; border-left: 1px solid var(--line); }
 .precedence-note > span { display: block; font-size: 13px; color: var(--muted); }
@@ -233,6 +233,12 @@ tbody tr:hover { background: #fafcfc; }
 .rule-advanced { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 12px; }
 .rule-advanced > summary { color: var(--accent); cursor: pointer; font-size: 14px; font-weight: 650; }
 .rule-advanced[open] > .rule-grid { padding-top: 14px; }
+.category-picker { min-width: 0; padding: 0; border: 0; }
+.category-picker legend { margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+.category-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.category-options label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-subtle); font-size: 13px; cursor: pointer; }
+.category-options label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.rule-advanced { margin-top: 2px; }
 .rule-title { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .rule-number { margin-right: auto; color: var(--muted); font-size: 13px; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }

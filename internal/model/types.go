@@ -17,6 +17,10 @@ var shaPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 var categoryPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 var detectorPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$`)
 
+var SupportedFileTypes = []string{
+	"txt", "md", "markdown", "mdx", "rst", "csv", "tsv", "json", "jsonl", "ndjson", "xml", "html", "htm", "yaml", "yml", "toml", "ini", "conf", "config", "properties", "log", "env", "sql", "py", "js", "jsx", "mjs", "cjs", "ts", "tsx", "go", "rs", "c", "h", "cc", "cpp", "hpp", "hxx", "cs", "java", "kt", "kts", "swift", "php", "rb", "sh", "bash", "zsh", "ps1", "bat", "cmd", "css", "scss", "less", "vue", "svelte", "tf", "tfvars", "hcl", "dockerignore", "gitignore", "dockerfile", "makefile",
+}
+
 func UUID(s string) bool { return uuidPattern.MatchString(s) }
 
 func NewUUID() string {
@@ -81,6 +85,7 @@ func (p *Policy) UnmarshalJSON(data []byte) error {
 }
 
 type Policy struct {
+	Name             string       `json:"name"`
 	Version          string       `json:"version"`
 	GeneratedAt      time.Time    `json:"generated_at"`
 	FailureMode      string       `json:"failure_mode"`
@@ -92,8 +97,8 @@ type Policy struct {
 func DefaultPolicy() Policy {
 	now := time.Now().UTC().Truncate(time.Second)
 	return Policy{
-		Version: NewUUID(), GeneratedAt: now, FailureMode: "block",
-		AllowedFileTypes: []string{"txt", "csv", "json", "xml", "yaml", "yml", "log", "env", "sql", "py", "js", "ts", "go", "rs"},
+		Name: "Baseline protection", Version: NewUUID(), GeneratedAt: now, FailureMode: "block",
+		AllowedFileTypes: append([]string(nil), SupportedFileTypes...),
 		Tags:             []string{"credential", "private_key", "pii", "financial", "identity:id:nik", "environment:env"},
 		Rules: []PolicyRule{
 			{ID: NewUUID(), Name: "Block credentials", Enabled: true, Priority: 10, Action: "block", Categories: []string{"credential", "private_key"}, MinSeverity: "high", Providers: []string{}, Tags: []string{}},
@@ -120,6 +125,9 @@ func set(values ...string) map[string]bool {
 func validEnum(value string, allowed map[string]bool) bool { return allowed[value] }
 
 func (p Policy) Validate() error {
+	if strings.TrimSpace(p.Name) == "" || len(p.Name) > 120 {
+		return errors.New("name must contain 1 to 120 characters")
+	}
 	if !UUID(p.Version) {
 		return errors.New("version must be a UUID")
 	}
@@ -135,7 +143,7 @@ func (p Policy) Validate() error {
 	if len(p.AllowedFileTypes) == 0 || len(p.AllowedFileTypes) > 100 || len(p.Tags) > 100 {
 		return errors.New("allowed_file_types must contain 1 to 100 items and tags at most 100 items")
 	}
-	supportedTypes := set("txt", "csv", "json", "xml", "yaml", "yml", "log", "env", "sql", "py", "js", "ts", "go", "rs")
+	supportedTypes := set(SupportedFileTypes...)
 	for _, extension := range p.AllowedFileTypes {
 		if !supportedTypes[extension] {
 			return errors.New("allowed_file_types must contain supported lowercase file extensions without dots")
@@ -228,6 +236,7 @@ type Event struct {
 	Findings             []Finding `json:"findings"`
 	RiskScore            int       `json:"risk_score"`
 	PolicyVersion        string    `json:"policy_version"`
+	PolicyName           string    `json:"policy_name,omitempty"`
 }
 
 func (e *Event) UnmarshalJSON(data []byte) error {
