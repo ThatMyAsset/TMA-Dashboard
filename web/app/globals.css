@@ -200,6 +200,12 @@ tbody tr:hover { background: #fafcfc; }
 .pairing-form .field { max-width: 380px; flex: 1; }
 .pairing-form .button { margin-bottom: 27px; }
 .pairing-result { padding: 22px; }
+.pairing-codes-panel { margin-bottom: 24px; }
+.pairing-codes-empty { display: flex; align-items: center; gap: 14px; min-height: 108px; padding: 20px 22px; }
+.pairing-codes-empty__icon { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
+.pairing-codes-empty div { min-width: 0; flex: 1; }
+.pairing-codes-empty strong { display: block; font-size: 14px; }
+.pairing-codes-empty p { margin-top: 3px; color: var(--muted); font-size: 13px; }
 .pairing-instructions { display: flex; align-items: flex-start; gap: 12px; max-width: 760px; }
 .pairing-instructions p { color: var(--muted); font-size: 14px; }
 .step-number { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; background: var(--accent-soft); color: var(--accent); border-radius: 50%; font-size: 12px; font-weight: 600; }
@@ -326,6 +332,8 @@ tbody tr:hover { background: #fafcfc; }
   .pairing-form { align-items: stretch; flex-direction: column; }
   .pairing-form .field { max-width: none; }
   .pairing-form .button { margin-bottom: 0; }
+  .pairing-codes-empty { align-items: flex-start; flex-wrap: wrap; }
+  .pairing-codes-empty .button { width: 100%; }
   .code-box { flex-direction: column; align-items: stretch; }
   .policy-settings { grid-template-columns: 1fr; gap: 20px; }
   .precedence-note { border-left: 0; border-top: 1px solid var(--line); padding: 18px 0 0; }
