@@ -1,0 +1,50 @@
+name: dashboard-release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.5'
+          cache-dependency-path: go.sum
+
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build ./cmd/control-plane
+
+      - run: npm test
+      - run: npm run build:release
+
+      - name: Build Dashboard web app
+        working-directory: web
+        run: |
+          npm ci --omit=optional
+          npm test
+          npm run typecheck
+          npm run build
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: TMA Dashboard ${{ github.ref_name }}
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            release/TMA-Dashboard-Setup.tar.gz
+            release/TMA-Dashboard-Setup.tar.gz.sha256

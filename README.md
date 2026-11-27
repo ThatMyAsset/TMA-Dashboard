@@ -14,7 +14,7 @@ Production-conscious vertical slice of ThatMyAssets AI data-loss prevention: Go 
 The `@thatmyassets/dashboard` package is **not published to the npm registry**. Download the versioned release bundle and inspect its small setup script before running it; no registry download is needed:
 
 ```sh
-curl -fLO https://github.com/ThatMyAsset/TMA-Dashboard/releases/download/v0.1.0/TMA-Dashboard-Setup.tar.gz
+curl -fLO https://github.com/ThatMyAsset/TMA-Dashboard/releases/download/v0.1.1/TMA-Dashboard-Setup.tar.gz
 tar -xzf TMA-Dashboard-Setup.tar.gz
 sh ./TMA-Dashboard-Setup/setup.sh install
 ```
@@ -24,7 +24,7 @@ sh ./TMA-Dashboard-Setup/setup.sh install
 For a reproducible downloader with archive validation and automatic temporary-file cleanup, inspect [`install.sh`](./install.sh), then run it:
 
 ```sh
-curl -fLO https://raw.githubusercontent.com/ThatMyAsset/TMA-Dashboard/v0.1.0/install.sh
+curl -fLO https://raw.githubusercontent.com/ThatMyAsset/TMA-Dashboard/v0.1.1/install.sh
 chmod +x install.sh
 ./install.sh
 ```
