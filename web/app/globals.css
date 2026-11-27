@@ -235,7 +235,7 @@ tbody tr:hover { background: #fafcfc; }
 .form-actions { display: flex; justify-content: flex-end; gap: 12px; padding: 18px 22px; border-top: 1px solid var(--line); }
 .policy-editor .form-error { margin: 0 22px 18px; }
 .policy-history { padding: 0 22px; }
-.policy-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.policy-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 24px; padding: 20px 0; border-bottom: 1px solid var(--line); }
 .policy-row:last-child { border-bottom: 0; }
 .policy-row-main { display: flex; align-items: center; gap: 13px; min-width: 0; }
 .policy-name { display: flex; align-items: center; gap: 10px; }
@@ -243,9 +243,10 @@ tbody tr:hover { background: #fafcfc; }
 .policy-row-main p { color: var(--muted); font-size: 13px; margin-top: 4px; }
 .active-tag { background: var(--green-soft); color: var(--green); padding: 2px 7px; border-radius: 4px; font-size: 12px; font-weight: 500; }
 .policy-row-meta { display: flex; align-items: center; gap: 20px; }
-.policy-row details { position: relative; }
+.policy-row details { min-width: 0; }
 .policy-row summary { color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 500; padding: 8px 0; white-space: nowrap; }
-.policy-rules { position: absolute; right: 0; top: 40px; width: min(620px, 80vw); z-index: 5; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 16px; box-shadow: 0 12px 30px #152b3626; }
+.policy-rule-details { grid-column: 1 / -1; }
+.policy-rules { position: static; width: auto; background: var(--surface-subtle); border: 1px solid var(--line); border-radius: 8px; padding: 8px 16px; margin: 6px 0 2px; }
 .policy-rules > div { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .policy-rules > div:last-child { border: 0; }
 .policy-rules .priority { display: grid; place-items: center; width: 34px; height: 28px; background: var(--surface-subtle); color: var(--muted); font-size: 12px; border-radius: 4px; }
@@ -284,7 +285,7 @@ tbody tr:hover { background: #fafcfc; }
   :root { --sidebar: 232px; }
   .main-content, .topbar { padding-left: 24px; padding-right: 24px; }
   .account-name { display: none; }
-  .policy-row { align-items: flex-start; }
+  .policy-row { grid-template-columns: minmax(0, 1fr) auto; align-items: flex-start; }
   .policy-row-meta { flex-direction: column; align-items: flex-end; gap: 6px; }
   .login-page { grid-template-columns: 1fr 1fr; }
 }
@@ -347,10 +348,11 @@ tbody tr:hover { background: #fafcfc; }
   .field--wide { grid-column: auto; }
   .rule-title { flex-wrap: wrap; }
   .rule-number { order: 3; }
-  .policy-row { flex-direction: column; gap: 14px; }
+  .policy-row { grid-template-columns: 1fr; gap: 14px; }
+  .policy-rule-details { grid-column: auto; }
   .policy-row-meta { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
   .policy-history { padding: 0 16px; }
-  .policy-rules { position: fixed; left: 18px; right: 18px; top: 80px; width: auto; max-height: 75vh; overflow-y: auto; }
+  .policy-rules { position: static; width: auto; max-height: none; overflow: visible; padding: 8px 12px; }
   .form-actions { padding: 16px; }
   .form-actions .button { flex: 1; }
   .login-panel h2 { font-size: 24px; }

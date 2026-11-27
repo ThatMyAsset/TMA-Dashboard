@@ -3,7 +3,7 @@
 # Inspect this file before running it. TMA_VERSION may select another release.
 set -eu
 
-VERSION="${TMA_VERSION:-0.1.1}"
+VERSION="${TMA_VERSION:-0.1.2}"
 VERSION="${VERSION#v}"
 TAG="v$VERSION"
 REPOSITORY="https://github.com/ThatMyAsset/TMA-Dashboard"
