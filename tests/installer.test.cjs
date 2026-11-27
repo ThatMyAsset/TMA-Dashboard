@@ -167,3 +167,11 @@ test("Docker Compose ignores inherited installer and Compose overrides", async (
   assert.equal(clean.COMPOSE_PROJECT_NAME, undefined);
   assert.equal(clean.PATH, process.env.PATH);
 });
+
+
+test("Control Plane origin policy comes from the install env file, not shell interpolation", async () => {
+  const compose = await fs.promises.readFile(path.join(__dirname, "..", "compose.yaml"), "utf8");
+  assert.match(compose, /env_file:\\s*\\n\\s+- \.env/);
+  assert.doesNotMatch(compose, /ALLOWED_ORIGINS:\\s*\\$\\{/);
+  assert.doesNotMatch(compose, /DEV_ALLOW_ALL_ORIGINS:\\s*\\$\\{/);
+});
