@@ -124,6 +124,15 @@ function renderEnv(config) {
   return `${Object.entries(values).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join("\n")}\n`;
 }
 
+function renderPostgresEnv(config) {
+  const values = {
+    POSTGRES_DB: config.dbName,
+    POSTGRES_USER: config.dbUser,
+    POSTGRES_PASSWORD: config.dbPassword,
+  };
+  return `${Object.entries(values).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join("\\n")}\\n`;
+}
+
 function parseEnv(text) {
   const result = {};
   for (const [index, line] of text.split(/\r?\n/).entries()) {
@@ -145,4 +154,4 @@ function redactEnv(text) {
   }).join("\n");
 }
 
-module.exports = { defaults, validateConfig, validateSecret, parseOrigin, parseOrigins, renderEnv, parseEnv, redactEnv, secret, integer };
+module.exports = { defaults, validateConfig, validateSecret, parseOrigin, parseOrigins, renderEnv, renderPostgresEnv, parseEnv, redactEnv, secret, integer };
