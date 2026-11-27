@@ -73,6 +73,20 @@ async function copySource(destination) {
 function composeArgs(config, ...args) {
   return ["compose", "--env-file", path.join(config.installDir, ".env"), "-f", path.join(config.installDir, "compose.yaml"), ...args];
 }
+
+// Compose gives inherited shell variables precedence over --env-file. Remove
+// installer-owned settings from the child environment so .env is authoritative.
+// Also remove COMPOSE_* selectors that could silently load another project/file.
+function composeEnvironment(config, inherited = process.env) {
+  const env = { ...inherited };
+  const envFile = path.join(config.installDir, ".env");
+  const configured = parseEnv(fs.readFileSync(envFile, "utf8"));
+  for (const key of Object.keys(configured)) delete env[key];
+  for (const key of Object.keys(env)) {
+    if (key.startsWith("COMPOSE_")) delete env[key];
+  }
+  return env;
+}
 async function assertPortsFree(config) {
   const ports = [config.webPort, config.controlPlanePort];
   const busy = [];
@@ -113,8 +127,8 @@ async function installDocker(config) {
   await requireCommands([["docker", ["--version"]], ["docker", ["compose", "version"], "Docker Compose v2"], ["docker", ["info", "--format", "{{.ServerVersion}}"], "running Docker daemon"]]);
   console.log("Build images include Go 1.23 and Node.js 22; PostgreSQL is pinned in compose.yaml.");
   console.log("Building and starting PostgreSQL, Control Plane, and Dashboard...");
-  await run("docker", composeArgs(config, "config", "--quiet"), { cwd: config.installDir });
-  await run("docker", composeArgs(config, "up", "--build", "-d"), { cwd: config.installDir });
+  await run("docker", composeArgs(config, "config", "--quiet"), { cwd: config.installDir, env: composeEnvironment(config) });
+  await run("docker", composeArgs(config, "up", "--build", "-d"), { cwd: config.installDir, env: composeEnvironment(config) });
   await waitForDocker(config);
 }
 
