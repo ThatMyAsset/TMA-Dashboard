@@ -147,7 +147,7 @@ test("existing Docker secrets override regenerated defaults on reinstall", async
 test("Docker Compose ignores inherited installer and Compose overrides", async (context) => {
   const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "tma-compose-env-test-"));
   context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
-  await fs.promises.writeFile(path.join(directory, ".env"), 'ALLOWED_ORIGINS="http://43.157.201.52:3000"\\nWEB_PORT="3000"\\nCONTROL_PLANE_PORT="18080"\\n');
+  await fs.promises.writeFile(path.join(directory, ".env"), 'ALLOWED_ORIGINS="http://43.157.201.52:3000"\nWEB_PORT="3000"\nCONTROL_PLANE_PORT="18080"\n');
   const config = { installDir: directory };
   const inherited = {
     PATH: process.env.PATH,
