@@ -1,8 +1,8 @@
 package httpapi
 
 import (
-	"encoding/base64"
 	"context"
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"net/http"
