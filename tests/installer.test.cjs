@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { defaults, validateConfig, renderEnv, renderPostgresEnv, parseEnv, redactEnv, parseOrigin, parseOrigins } = require("../installer/config.cjs");
 const { parseArguments, collect } = require("../installer/cli.cjs");
-const { main, plan, systemdUnits, atomicWrite, assertPortsFree, preserveDockerSecrets, composeEnvironment } = require("../installer/index.cjs");
+const { main, plan, systemdUnits, atomicWrite, assertPortsFree, preserveDockerSecrets, composeEnvironment, ownedPublishedPorts } = require("../installer/index.cjs");
 const net = require("node:net");
 
 const passwords = { adminPassword: "correct-horse-battery", adminPasswordConfirm: "correct-horse-battery", dbPassword: "database_password_12345" };
