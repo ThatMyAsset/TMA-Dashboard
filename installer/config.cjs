@@ -111,6 +111,9 @@ function renderEnv(config) {
     COOKIE_SECURE: String(config.secureCookies),
     TRUST_PROXY: String(config.secureCookies),
   };
+  if (config.mode === "docker") {
+    values.DATABASE_URL = `postgres://${encodeURIComponent(config.dbUser)}:${encodeURIComponent(config.dbPassword)}@postgres:5432/${encodeURIComponent(config.dbName)}?sslmode=disable`;
+  }
   if (config.mode === "system") Object.assign(values, {
     DATABASE_URL: config.databaseUrl,
     LISTEN_ADDR: `127.0.0.1:${config.controlPlanePort}`,
