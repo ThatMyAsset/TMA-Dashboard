@@ -1,6 +1,6 @@
 {
   "name": "@thatmyassets/dashboard",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Interactive installer for the ThatMyAssets dashboard",
   "license": "Apache-2.0",
   "type": "commonjs",

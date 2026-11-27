@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiTarget } from "@/lib/api";
 
-const allowed = new Set(["GET", "POST"]);
+const allowed = new Set(["GET", "POST", "PUT", "DELETE"]);
 const hopHeaders = new Set(["connection", "content-length", "host", "transfer-encoding"]);
 
 async function proxy(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
@@ -19,7 +19,7 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
     const response = await fetch(target, {
       method: request.method,
       headers,
-      body: request.method === "POST" ? await request.arrayBuffer() : undefined,
+      body: request.method === "GET" ? undefined : await request.arrayBuffer(),
       cache: "no-store",
       signal: AbortSignal.timeout(15_000)
     });
@@ -33,4 +33,4 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   }
 }
 
-export { proxy as GET, proxy as POST };
+export { proxy as GET, proxy as POST, proxy as PUT, proxy as DELETE };
