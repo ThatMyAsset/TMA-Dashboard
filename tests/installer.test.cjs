@@ -162,7 +162,7 @@ test("Docker Compose ignores inherited installer and Compose overrides", async (
   assert.equal(clean.ALLOWED_ORIGINS, undefined);
   assert.equal(clean.WEB_PORT, undefined);
   assert.equal(clean.CONTROL_PLANE_PORT, undefined);
-  assert.equal(clean.DASHBOARD_HOST, "127.0.0.1");
+  assert.equal(clean.DASHBOARD_HOST, undefined);
   assert.equal(clean.COMPOSE_FILE, undefined);
   assert.equal(clean.COMPOSE_PROJECT_NAME, undefined);
   assert.equal(clean.PATH, process.env.PATH);
