@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cp .env.example .env && docker compose --env-file .env.example config --quiet
+      - run: cp .env.example .env && cp .postgres.env.example .postgres.env && docker compose --env-file .env.example config --quiet
 
   installer:
     runs-on: ubuntu-latest
