@@ -12,3 +12,4 @@ web/*.tsbuildinfo
 .agent-check-target/
 release/
 *.tgz
+.postgres.env
