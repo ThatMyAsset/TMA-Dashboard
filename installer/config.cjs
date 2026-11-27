@@ -130,7 +130,7 @@ function renderPostgresEnv(config) {
     POSTGRES_USER: config.dbUser,
     POSTGRES_PASSWORD: config.dbPassword,
   };
-  return `${Object.entries(values).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join("\\n")}\\n`;
+  return `${Object.entries(values).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join("\n")}\n`;
 }
 
 function parseEnv(text) {
