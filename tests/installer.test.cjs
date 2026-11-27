@@ -181,3 +181,11 @@ test("Control Plane runtime settings come from the install env file, not shell i
     assert.equal(compose.includes(key + ": ${"), false, `${key} must come from env_file`);
   }
 });
+
+
+test("reinstall ignores ports already published by the existing Dashboard Compose project", () => {
+  const published = "0.0.0.0:3000->3000/tcp, 0.0.0.0:18080->8080/tcp";
+  assert.deepEqual(ownedPublishedPorts(published, [3000, 18080]), [3000, 18080]);
+  assert.deepEqual(ownedPublishedPorts(published, [3000, 18080, 19000]), [3000, 18080]);
+  assert.deepEqual(ownedPublishedPorts("127.0.0.1:3000->3000/tcp", [3000, 18080]), [3000]);
+});
