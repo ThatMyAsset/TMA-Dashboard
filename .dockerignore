@@ -3,3 +3,4 @@
 web
 *.md
 .github
+.postgres.env
