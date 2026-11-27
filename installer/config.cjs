@@ -111,6 +111,9 @@ function renderEnv(config) {
     COOKIE_SECURE: String(config.secureCookies),
     TRUST_PROXY: String(config.secureCookies),
   };
+  if (config.mode === "docker") {
+    values.DATABASE_URL = `postgres://${encodeURIComponent(config.dbUser)}:${encodeURIComponent(config.dbPassword)}@postgres:5432/${encodeURIComponent(config.dbName)}?sslmode=disable`;
+  }
   if (config.mode === "system") Object.assign(values, {
     DATABASE_URL: config.databaseUrl,
     LISTEN_ADDR: `127.0.0.1:${config.controlPlanePort}`,
@@ -118,6 +121,15 @@ function renderEnv(config) {
     HOSTNAME: "127.0.0.1",
     PORT: String(config.webPort),
   });
+  return `${Object.entries(values).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join("\n")}\n`;
+}
+
+function renderPostgresEnv(config) {
+  const values = {
+    POSTGRES_DB: config.dbName,
+    POSTGRES_USER: config.dbUser,
+    POSTGRES_PASSWORD: config.dbPassword,
+  };
   return `${Object.entries(values).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join("\n")}\n`;
 }
 
@@ -142,4 +154,4 @@ function redactEnv(text) {
   }).join("\n");
 }
 
-module.exports = { defaults, validateConfig, validateSecret, parseOrigin, parseOrigins, renderEnv, parseEnv, redactEnv, secret, integer };
+module.exports = { defaults, validateConfig, validateSecret, parseOrigin, parseOrigins, renderEnv, renderPostgresEnv, parseEnv, redactEnv, secret, integer };

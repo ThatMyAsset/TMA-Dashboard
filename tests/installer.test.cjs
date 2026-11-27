@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { defaults, validateConfig, renderEnv, parseEnv, redactEnv, parseOrigin, parseOrigins } = require("../installer/config.cjs");
+const { defaults, validateConfig, renderEnv, renderPostgresEnv, parseEnv, redactEnv, parseOrigin, parseOrigins } = require("../installer/config.cjs");
 const { parseArguments, collect } = require("../installer/cli.cjs");
 const { main, plan, systemdUnits, atomicWrite, assertPortsFree, preserveDockerSecrets, composeEnvironment } = require("../installer/index.cjs");
 const net = require("node:net");
@@ -20,6 +20,8 @@ test("noninteractive arguments and environment create a valid configuration", as
   assert.equal(config.origin, "http://localhost:3100");
   const dockerEnv = parseEnv(renderEnv(config));
   assert.equal(dockerEnv.WEB_PORT, "3100");
+  assert.equal(dockerEnv.DATABASE_URL, "postgres://tma:database_password_12345@postgres:5432/tma?sslmode=disable");
+  assert.deepEqual(parseEnv(renderPostgresEnv(config)), { POSTGRES_DB: "tma", POSTGRES_USER: "tma", POSTGRES_PASSWORD: passwords.dbPassword });
   assert.equal(Object.hasOwn(dockerEnv, "DASHBOARD_HOST"), false);
   assert.equal(Object.hasOwn(dockerEnv, "CONTROL_PLANE_HOST"), false);
   assert.equal(dockerEnv.CONTROL_PLANE_PORT, "18080");
@@ -166,4 +168,16 @@ test("Docker Compose ignores inherited installer and Compose overrides", async (
   assert.equal(clean.COMPOSE_FILE, undefined);
   assert.equal(clean.COMPOSE_PROJECT_NAME, undefined);
   assert.equal(clean.PATH, process.env.PATH);
+});
+
+
+test("Control Plane runtime settings come from the install env file, not shell interpolation", async () => {
+  const compose = await fs.promises.readFile(path.join(__dirname, "..", "compose.yaml"), "utf8");
+  assert.match(compose, /env_file:\s*\n\s+- \.env/);
+  assert.match(compose, /env_file:\s*\n\s+- \.postgres\.env/);
+  const dockerignore = await fs.promises.readFile(path.join(__dirname, "..", ".dockerignore"), "utf8");
+  assert.ok(dockerignore.split(/\r?\n/).includes(".postgres.env"));
+  for (const key of ["DATABASE_URL", "ADMIN_USERNAME", "ADMIN_PASSWORD", "ADMIN_API_TOKEN", "ALLOWED_ORIGINS", "DEV_ALLOW_ALL_ORIGINS", "COOKIE_SECURE", "TRUST_PROXY", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"]) {
+    assert.equal(compose.includes(key + ": ${"), false, `${key} must come from env_file`);
+  }
 });

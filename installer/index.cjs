@@ -6,7 +6,7 @@ const { spawn } = require("node:child_process");
 const net = require("node:net");
 const { setTimeout: sleep } = require("node:timers/promises");
 const { parseArguments, collect, packageVersion, HELP } = require("./cli.cjs");
-const { renderEnv, redactEnv, parseEnv } = require("./config.cjs");
+const { renderEnv, renderPostgresEnv, redactEnv, parseEnv } = require("./config.cjs");
 
 const SOURCE_ENTRIES = ["cmd", "internal", "web", "compose.yaml", "Dockerfile", ".dockerignore", ".env.example", "go.mod", "go.sum", "README.md", "LICENSE"];
 const executable = (name) => process.platform === "win32" ? `${name}.exe` : name;
@@ -311,7 +311,10 @@ async function install(options) {
   await fs.promises.mkdir(config.installDir, { recursive: true, mode: 0o700 });
   await copySource(config.installDir);
   await atomicWrite(path.join(config.installDir, ".env"), env);
-  if (config.mode === "docker") await installDocker(config);
+  if (config.mode === "docker") {
+    await atomicWrite(path.join(config.installDir, ".postgres.env"), renderPostgresEnv(config));
+    await installDocker(config);
+  }
   const mode = config.mode === "docker" ? "docker" : await installSystem(config, options.service);
   await atomicWrite(path.join(config.installDir, "installation.json"), `${JSON.stringify({ version: packageVersion(), mode, origin: config.origin }, null, 2)}\n`);
   console.log(`\nInstallation healthy. Open ${config.origin}`);
